@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -32,6 +32,7 @@ import com.thoughtworks.xstream.io.HierarchicalStreamReader;
  * @author Michael Grammling - Initial Contribution
  * @author Thomas Höfer - Added thing and thing type properties
  * @author Chris Jackson - Added channel properties
+ * @author Andre Fuechsel - Added representationProperty
  */
 public class ThingTypeConverter extends AbstractDescriptionTypeConverter<ThingTypeXmlResult> {
 
@@ -93,11 +94,20 @@ public class ThingTypeConverter extends AbstractDescriptionTypeConverter<ThingTy
 
         ThingTypeXmlResult thingTypeXmlResult = new ThingTypeXmlResult(
                 new ThingTypeUID(super.getUID(attributes, context)), readSupportedBridgeTypeUIDs(nodeIterator, context),
-                super.readLabel(nodeIterator), super.readDescription(nodeIterator), getListed(attributes),
-                getChannelTypeReferenceObjects(nodeIterator), getProperties(nodeIterator),
-                super.getConfigDescriptionObjects(nodeIterator));
+                super.readLabel(nodeIterator), super.readDescription(nodeIterator), readCategory(nodeIterator),
+                getListed(attributes), getChannelTypeReferenceObjects(nodeIterator), getProperties(nodeIterator),
+                getRepresentationProperty(nodeIterator), super.getConfigDescriptionObjects(nodeIterator));
 
         return thingTypeXmlResult;
+    }
+
+    protected String readCategory(NodeIterator nodeIterator) {
+        Object category = nodeIterator.nextValue("category", false);
+        if (category != null) {
+            return category.toString();
+        } else {
+            return null;
+        }
     }
 
     protected boolean getListed(Map<String, String> attributes) {
@@ -106,6 +116,10 @@ public class ThingTypeConverter extends AbstractDescriptionTypeConverter<ThingTy
             return Boolean.parseBoolean(listedFlag);
         }
         return true;
+    }
+
+    protected String getRepresentationProperty(NodeIterator nodeIterator) {
+        return (String) nodeIterator.nextValue("representation-property", false);
     }
 
 }

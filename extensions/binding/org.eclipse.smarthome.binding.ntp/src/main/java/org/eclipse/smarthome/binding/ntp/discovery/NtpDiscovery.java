@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -33,13 +33,21 @@ public class NtpDiscovery extends AbstractDiscoveryService {
     }
 
     @Override
+    protected void activate(Map<String, Object> configProperties) {
+        super.activate(configProperties);
+    }
+
+    @Override
+    protected void modified(Map<String, Object> configProperties) {
+        super.modified(configProperties);
+    }
+
+    @Override
     protected void startBackgroundDiscovery() {
-        scheduler.schedule(new Runnable() {
-            @Override
-            public void run() {
-                discoverNtp();
-            }
+        scheduler.schedule(() -> {
+            discoverNtp();
         }, 1, TimeUnit.SECONDS);
+
     }
 
     @Override

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,8 +14,11 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.core.items.Item;
+import org.eclipse.smarthome.core.thing.type.ChannelKind;
 import org.eclipse.smarthome.core.thing.type.ChannelTypeUID;
 
 /**
@@ -34,6 +37,8 @@ public class Channel {
 
     private String acceptedItemType;
 
+    private ChannelKind kind;
+
     private ChannelUID uid;
 
     private ChannelTypeUID channelTypeUID;
@@ -42,9 +47,9 @@ public class Channel {
 
     private String description;
 
-    private Configuration configuration;
+    private @NonNull Configuration configuration;
 
-    private Map<String, String> properties;
+    private @NonNull Map<@NonNull String, String> properties;
 
     private Set<String> defaultTags = new LinkedHashSet<>();
 
@@ -52,45 +57,56 @@ public class Channel {
      * Package protected default constructor to allow reflective instantiation.
      */
     Channel() {
+        this.configuration = new Configuration();
+        this.properties = Collections.unmodifiableMap(new HashMap<@NonNull String, String>(0));
     }
 
     public Channel(ChannelUID uid, String acceptedItemType) {
         this.uid = uid;
         this.acceptedItemType = acceptedItemType;
+        this.kind = ChannelKind.STATE;
         this.configuration = new Configuration();
-        this.properties = Collections.unmodifiableMap(new HashMap<String, String>(0));
+        this.properties = Collections.unmodifiableMap(new HashMap<@NonNull String, String>(0));
     }
 
     public Channel(ChannelUID uid, String acceptedItemType, Configuration configuration) {
-        this(uid, null, acceptedItemType, configuration, new HashSet<String>(0), null, null, null);
+        this(uid, null, acceptedItemType, ChannelKind.STATE, configuration, new HashSet<String>(0), null, null, null);
     }
 
     public Channel(ChannelUID uid, String acceptedItemType, Set<String> defaultTags) {
-        this(uid, null, acceptedItemType, null, defaultTags == null ? new HashSet<String>(0) : defaultTags, null, null,
-                null);
+        this(uid, null, acceptedItemType, ChannelKind.STATE, null,
+                defaultTags == null ? new HashSet<String>(0) : defaultTags, null, null, null);
     }
 
     public Channel(ChannelUID uid, String acceptedItemType, Configuration configuration, Set<String> defaultTags,
-            Map<String, String> properties) {
-        this(uid, null, acceptedItemType, null, defaultTags == null ? new HashSet<String>(0) : defaultTags, properties,
-                null, null);
+            Map<@NonNull String, String> properties) {
+        this(uid, null, acceptedItemType, ChannelKind.STATE, null,
+                defaultTags == null ? new HashSet<String>(0) : defaultTags, properties, null, null);
     }
 
-    public Channel(ChannelUID uid, ChannelTypeUID channelTypeUID, String acceptedItemType, Configuration configuration,
-            Set<String> defaultTags, Map<String, String> properties, String label, String description) {
+    public Channel(ChannelUID uid, ChannelTypeUID channelTypeUID, String acceptedItemType, ChannelKind kind,
+            Configuration configuration, Set<String> defaultTags, Map<@NonNull String, String> properties, String label,
+            String description) {
+        if (kind == null) {
+            throw new IllegalArgumentException("kind must not be null");
+        }
+
         this.uid = uid;
         this.channelTypeUID = channelTypeUID;
         this.acceptedItemType = acceptedItemType;
-        this.configuration = configuration;
+        this.kind = kind;
         this.label = label;
         this.description = description;
-        this.properties = properties;
         this.defaultTags = Collections.<String> unmodifiableSet(new HashSet<String>(defaultTags));
-        if (this.configuration == null) {
+        if (configuration == null) {
             this.configuration = new Configuration();
+        } else {
+            this.configuration = configuration;
         }
-        if (this.properties == null) {
-            this.properties = Collections.unmodifiableMap(new HashMap<String, String>(0));
+        if (properties == null) {
+            this.properties = Collections.unmodifiableMap(new HashMap<@NonNull String, String>(0));
+        } else {
+            this.properties = properties;
         }
     }
 
@@ -101,6 +117,20 @@ public class Channel {
      */
     public String getAcceptedItemType() {
         return this.acceptedItemType;
+    }
+
+    /**
+     * Returns the channel kind.
+     *
+     * @return channel kind
+     */
+    public ChannelKind getKind() {
+        if (kind == null) {
+            // STATE is the default.
+            return ChannelKind.STATE;
+        }
+
+        return kind;
     }
 
     /**
@@ -117,7 +147,7 @@ public class Channel {
      *
      * @return channel type UID or null if no channel type is specified
      */
-    public ChannelTypeUID getChannelTypeUID() {
+    public @Nullable ChannelTypeUID getChannelTypeUID() {
         return channelTypeUID;
     }
 
@@ -127,7 +157,7 @@ public class Channel {
      *
      * @return the label for the channel. Can be null.
      */
-    public String getLabel() {
+    public @Nullable String getLabel() {
         return this.label;
     }
 
@@ -138,7 +168,7 @@ public class Channel {
      *
      * @return the description for the channel. Can be null.
      */
-    public String getDescription() {
+    public @Nullable String getDescription() {
         return this.description;
     }
 
@@ -147,7 +177,7 @@ public class Channel {
      *
      * @return channel configuration (not null)
      */
-    public Configuration getConfiguration() {
+    public @NonNull Configuration getConfiguration() {
         return configuration;
     }
 
@@ -156,7 +186,7 @@ public class Channel {
      *
      * @return channel properties (not null)
      */
-    public Map<String, String> getProperties() {
+    public @NonNull Map<@NonNull String, String> getProperties() {
         return properties;
     }
 

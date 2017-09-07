@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -27,6 +27,7 @@ import com.thoughtworks.xstream.io.HierarchicalStreamReader;
  *
  * @author Michael Grammling - Initial Contribution
  * @author Thomas Höfer - Added thing and thing type properties
+ * @author Andre Fuechsel - Added representationProperty
  */
 public class BridgeTypeConverter extends ThingTypeConverter {
 
@@ -41,9 +42,9 @@ public class BridgeTypeConverter extends ThingTypeConverter {
         BridgeTypeXmlResult bridgeTypeXmlResult = new BridgeTypeXmlResult(
                 new ThingTypeUID(super.getUID(attributes, context)),
                 super.readSupportedBridgeTypeUIDs(nodeIterator, context), super.readLabel(nodeIterator),
-                super.readDescription(nodeIterator), super.getListed(attributes),
+                super.readDescription(nodeIterator), super.readCategory(nodeIterator), super.getListed(attributes),
                 super.getChannelTypeReferenceObjects(nodeIterator), getProperties(nodeIterator),
-                super.getConfigDescriptionObjects(nodeIterator));
+                super.getRepresentationProperty(nodeIterator), super.getConfigDescriptionObjects(nodeIterator));
 
         return bridgeTypeXmlResult;
     }

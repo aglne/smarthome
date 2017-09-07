@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -20,7 +20,6 @@ import org.eclipse.smarthome.core.thing.ThingTypeUID;
 import org.eclipse.smarthome.core.thing.type.ChannelDefinition;
 import org.eclipse.smarthome.core.thing.type.ChannelGroupDefinition;
 import org.eclipse.smarthome.core.thing.type.ChannelGroupTypeUID;
-import org.eclipse.smarthome.core.thing.type.ChannelTypeUID;
 import org.eclipse.smarthome.core.thing.type.ThingType;
 
 import com.thoughtworks.xstream.converters.ConversionException;
@@ -36,6 +35,8 @@ import com.thoughtworks.xstream.converters.ConversionException;
  * @author Thomas Höfer - Added thing and thing type properties
  * @author Chris Jackson - Added channel properties
  * @author Simon Kaufmann - Added listed field
+ * @author Andre Fuechsel - Added representationProperty field
+ * @author Stefan Triller - Added category field
  */
 public class ThingTypeXmlResult {
 
@@ -43,7 +44,9 @@ public class ThingTypeXmlResult {
     protected List<String> supportedBridgeTypeUIDs;
     protected String label;
     protected String description;
+    protected String category;
     protected boolean listed;
+    protected String representationProperty;
     protected List<ChannelXmlResult> channelTypeReferences;
     protected List<ChannelXmlResult> channelGroupTypeReferences;
     protected List<NodeValue> properties;
@@ -51,14 +54,16 @@ public class ThingTypeXmlResult {
     protected ConfigDescription configDescription;
 
     public ThingTypeXmlResult(ThingTypeUID thingTypeUID, List<String> supportedBridgeTypeUIDs, String label,
-            String description, boolean listed, List<ChannelXmlResult>[] channelTypeReferenceObjects,
-            List<NodeValue> properties, Object[] configDescriptionObjects) {
+            String description, String category, boolean listed, List<ChannelXmlResult>[] channelTypeReferenceObjects,
+            List<NodeValue> properties, String representationProperty, Object[] configDescriptionObjects) {
 
         this.thingTypeUID = thingTypeUID;
         this.supportedBridgeTypeUIDs = supportedBridgeTypeUIDs;
         this.label = label;
         this.description = description;
+        this.category = category;
         this.listed = listed;
+        this.representationProperty = representationProperty;
         this.channelTypeReferences = channelTypeReferenceObjects[0];
         this.channelGroupTypeReferences = channelTypeReferenceObjects[1];
         this.properties = properties;
@@ -79,27 +84,8 @@ public class ThingTypeXmlResult {
             channelTypeDefinitions = new ArrayList<>(channelTypeReferences.size());
 
             for (ChannelXmlResult channelTypeReference : channelTypeReferences) {
-                String id = channelTypeReference.getId();
-                String typeId = channelTypeReference.getTypeId();
-
-                String typeUID = String.format("%s:%s", this.thingTypeUID.getBindingId(), typeId);
-
-                int systemPrefixIdx = typeId.indexOf(XmlHelper.SYSTEM_NAMESPACE_PREFIX);
-                if (systemPrefixIdx != -1) {
-                    typeUID = XmlHelper.getSystemUID(typeId);
-                }
-
-                // Convert the channel properties into a map
-                Map<String, String> propertiesMap = new HashMap<>();
-                for (NodeValue property : channelTypeReference.getProperties()) {
-                    propertiesMap.put(property.getAttributes().get("name"), (String) property.getValue());
-                }
-
-                ChannelDefinition channelDefinition = new ChannelDefinition(id, new ChannelTypeUID(typeUID),
-                        propertiesMap, channelTypeReference.getLabel(), channelTypeReference.getDescription());
-                channelTypeDefinitions.add(channelDefinition);
+                channelTypeDefinitions.add(channelTypeReference.toChannelDefinition(this.thingTypeUID.getBindingId()));
             }
-
         }
 
         return channelTypeDefinitions;
@@ -120,7 +106,8 @@ public class ThingTypeXmlResult {
                 String typeUID = String.format("%s:%s", this.thingTypeUID.getBindingId(), typeId);
 
                 ChannelGroupDefinition channelGroupDefinition = new ChannelGroupDefinition(id,
-                        new ChannelGroupTypeUID(typeUID));
+                        new ChannelGroupTypeUID(typeUID), channelGroupTypeReference.getLabel(),
+                        channelGroupTypeReference.getDescription());
 
                 channelGroupTypeDefinitions.add(channelGroupDefinition);
 
@@ -145,7 +132,8 @@ public class ThingTypeXmlResult {
     public ThingType toThingType() throws ConversionException {
 
         ThingType thingType = new ThingType(this.thingTypeUID, this.supportedBridgeTypeUIDs, this.label,
-                this.description, this.listed, toChannelDefinitions(this.channelTypeReferences),
+                this.description, this.category, this.listed, this.representationProperty,
+                toChannelDefinitions(this.channelTypeReferences),
                 toChannelGroupDefinitions(this.channelGroupTypeReferences), toPropertiesMap(),
                 this.configDescriptionURI);
 
@@ -155,7 +143,8 @@ public class ThingTypeXmlResult {
     @Override
     public String toString() {
         return "ThingTypeXmlResult [thingTypeUID=" + thingTypeUID + ", supportedBridgeTypeUIDs="
-                + supportedBridgeTypeUIDs + ", label=" + label + ", description=" + description + ", listed=" + listed
+                + supportedBridgeTypeUIDs + ", label=" + label + ", description=" + description + ",  category="
+                + category + ", listed=" + listed + ", representationProperty=" + representationProperty
                 + ", channelTypeReferences=" + channelTypeReferences + ", channelGroupTypeReferences="
                 + channelGroupTypeReferences + ", properties=" + properties + ", configDescriptionURI="
                 + configDescriptionURI + ", configDescription=" + configDescription + "]";

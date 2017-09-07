@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,7 +17,7 @@ import org.eclipse.smarthome.config.core.internal.Activator
 import org.eclipse.smarthome.config.core.validation.ConfigValidationException
 import org.eclipse.smarthome.config.core.validation.ConfigValidationMessage
 import org.eclipse.smarthome.config.core.validation.internal.MessageKey
-import org.eclipse.smarthome.core.i18n.I18nProvider
+import org.eclipse.smarthome.core.i18n.TranslationProvider
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -64,6 +64,9 @@ class ConfigValidationExceptionTest {
     void setUp() {
         Activator.i18nProvider = [
             getText: { bundle, key, defaultText, locale, params ->
+                if(locale == null) {
+                    locale = Locale.ENGLISH;
+                }
                 if(MessageKey.PARAMETER_REQUIRED.key.equals(key)) {
                     if(DE.equals(locale)) {
                         TXT_DE1
@@ -78,15 +81,11 @@ class ConfigValidationExceptionTest {
                     }
                 }
             }
-        ] as I18nProvider
-
-        defaultLocale = Locale.getDefault()
-        Locale.setDefault(Locale.ENGLISH)
+        ] as TranslationProvider
     }
 
     @After
     void tearDown(){
-        Locale.setDefault(defaultLocale)
     }
 
     @Test

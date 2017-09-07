@@ -1,10 +1,9 @@
 'use strict';
 
-angular.module('PaperUI.controllers.rules').service('sharedProperties', function() {
+angular.module('PaperUI.controllers').service('sharedProperties', function() {
     var triggersArray = [];
     var actionsArray = [];
     var conditionsArray = [];
-    var tId = 1, aId = 1, cId = 1;
     var params = [];
     var moduleTypes = [];
     return {
@@ -28,18 +27,16 @@ angular.module('PaperUI.controllers.rules').service('sharedProperties', function
         },
         updateModule : function(type, value) {
             var modArr = this.getModuleArray(type);
-
+            var maxId = this.getMaxModuleId();
             if (!value.id) {
-                value.id = type + "_" + tId;
+                value.id = maxId;
                 modArr.push(value);
-                tId++;
             } else {
                 var index = this.searchArray(modArr, value.id);
                 if (index != -1) {
                     modArr[index] = value;
                 } else {
                     modArr.push(value);
-                    tId++;
                 }
             }
         },
@@ -60,7 +57,7 @@ angular.module('PaperUI.controllers.rules').service('sharedProperties', function
             angular.forEach(modArr, function(value) {
                 var type = typeof value.uid === "undefined" ? value.type : value.uid;
                 $moduleJSON.push({
-                    "id" : value.id ? value.id : modArr.mtype + "_" + i,
+                    "id" : value.id,
                     "label" : value.label,
                     "description" : value.description,
                     "type" : type,
@@ -75,10 +72,6 @@ angular.module('PaperUI.controllers.rules').service('sharedProperties', function
             triggersArray = [];
             actionsArray = [];
             conditionsArray = [];
-            tId = 1;
-            aId = 1;
-            cId = 1;
-
         },
         removeFromArray : function(opt, id) {
             var arr = null;
@@ -132,7 +125,86 @@ angular.module('PaperUI.controllers.rules').service('sharedProperties', function
 
         setModuleTypes : function(mTypes) {
             moduleTypes = mTypes;
+        },
+        getMaxModuleId : function() {
+            var max_id = 0;
+            var modules = [ 'trigger', 'action', 'condition' ];
+            for (var m = 0; m < modules.length; m++) {
+                var modArr = this.getModuleArray(modules[m]);
+                for (var i = 0; i < modArr.length; i++) {
+                    if (modArr[i].id && !isNaN(parseInt(modArr[i].id)) && parseInt(modArr[i].id) > max_id) {
+                        max_id = parseInt(modArr[i].id);
+                    }
+                }
+            }
+            return ++max_id;
         }
-
     }
+});
+angular.module('PaperUI.constants').constant('itemConfig', {
+    types : [ 'Switch', 'Contact', 'String', 'Number', 'Dimmer', 'DateTime', 'Color', 'Image', 'Player', 'Location', 'Rollershutter', 'Group' ],
+    groupTypes : [ 'Switch', 'Contact', 'Number', 'Dimmer', 'None' ],
+    arithmeticFunctions : [ {
+        name : "AVG",
+        value : "AVG"
+    }, {
+        name : "MAX",
+        value : "MAX"
+    }, {
+        name : "MIN",
+        value : "MIN"
+    }, {
+        name : "SUM",
+        value : "SUM"
+    } ],
+    logicalOnOffFunctions : [ {
+        name : "AND_ON_OFF",
+        value : "All ON → ON else OFF"
+    }, {
+        name : "NAND_ON_OFF",
+        value : "All ON → OFF else ON"
+    }, {
+        name : "OR_OFF_ON",
+        value : "All OFF → OFF else ON"
+    }, {
+        name : "NOR_ON_OFF",
+        value : "All OFF → ON else OFF"
+    }, {
+        name : "OR_ON_OFF",
+        value : "One ON → ON else OFF"
+    }, {
+        name : "NOR_ON_OFF",
+        value : "One ON → OFF else ON"
+    }, {
+        name : "AND_OFF_ON",
+        value : "One OFF → OFF else ON"
+    }, {
+        name : "NAND_OFF_ON",
+        value : "One OFF → ON else OFF"
+    } ],
+    logicalOpenClosedFunctions : [ {
+        name : "AND_OPEN_CLOSED",
+        value : "All OPEN → OPEN else CLOSED"
+    }, {
+        name : "NAND_OPEN_CLOSED",
+        value : "All OPEN → CLOSED else OPEN"
+    }, {
+        name : "OR_CLOSED_OPEN",
+        value : "All CLOSED → CLOSED else OPEN"
+    }, {
+        name : "NOR_OPEN_CLOSED",
+        value : "All CLOSED → OPEN else CLOSED"
+    }, {
+        name : "OR_OPEN_CLOSED",
+        value : "One OPEN → OPEN else CLOSED"
+    }, {
+        name : "NOR_OPEN_CLOSED",
+        value : "One OPEN → CLOSED else OPEN"
+    }, {
+        name : "AND_CLOSED_OPEN",
+        value : "One CLOSED → CLOSED else OPEN"
+    }, {
+        name : "NAND_CLOSED_OPEN",
+        value : "One CLOSED → OPEN else CLOSED"
+    } ]
 });

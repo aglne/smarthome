@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -26,22 +26,24 @@ import com.thoughtworks.xstream.converters.ConversionException;
  *
  * @author Michael Grammling - Initial Contribution
  * @author Thomas Höfer - Added thing and thing type properties
+ * @author Andre Fuechsel - Added representationProperty
  */
 public class BridgeTypeXmlResult extends ThingTypeXmlResult {
 
     public BridgeTypeXmlResult(ThingTypeUID bridgeTypeUID, List<String> supportedBridgeTypeUIDs, String label,
-            String description, boolean listed, List<ChannelXmlResult>[] channelTypeReferenceObjects,
-            List<NodeValue> properties, Object[] configDescriptionObjects) {
+            String description, String category, boolean listed, List<ChannelXmlResult>[] channelTypeReferenceObjects,
+            List<NodeValue> properties, String representationProperty, Object[] configDescriptionObjects) {
 
-        super(bridgeTypeUID, supportedBridgeTypeUIDs, label, description, listed, channelTypeReferenceObjects,
-                properties, configDescriptionObjects);
+        super(bridgeTypeUID, supportedBridgeTypeUIDs, label, description, category, listed, channelTypeReferenceObjects,
+                properties, representationProperty, configDescriptionObjects);
     }
 
     @Override
     public ThingType toThingType() throws ConversionException {
 
         BridgeType bridgeType = new BridgeType(super.thingTypeUID, super.supportedBridgeTypeUIDs, super.label,
-                super.description, super.listed, super.toChannelDefinitions(this.channelTypeReferences),
+                super.description, super.category, super.listed, super.representationProperty,
+                super.toChannelDefinitions(this.channelTypeReferences),
                 super.toChannelGroupDefinitions(this.channelGroupTypeReferences), super.toPropertiesMap(),
                 super.configDescriptionURI);
 
@@ -51,7 +53,8 @@ public class BridgeTypeXmlResult extends ThingTypeXmlResult {
     @Override
     public String toString() {
         return "BridgeTypeXmlResult [thingTypeUID=" + thingTypeUID + ", supportedBridgeTypeUIDs="
-                + supportedBridgeTypeUIDs + ", label=" + label + ", description=" + description + ", listed=" + listed
+                + supportedBridgeTypeUIDs + ", label=" + label + ", description=" + description + ", category="
+                + category + ", listed=" + listed + ", representationProperty=" + representationProperty
                 + ", channelTypeReferences=" + channelTypeReferences + ", channelGroupTypeReferences="
                 + channelGroupTypeReferences + ", properties=" + properties + ", configDescriptionURI="
                 + configDescriptionURI + ", configDescription=" + configDescription + "]";

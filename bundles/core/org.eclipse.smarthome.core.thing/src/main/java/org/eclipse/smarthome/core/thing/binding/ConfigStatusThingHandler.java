@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,6 +9,7 @@ package org.eclipse.smarthome.core.thing.binding;
 
 import java.util.Map;
 
+import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.config.core.status.ConfigStatusCallback;
 import org.eclipse.smarthome.config.core.status.ConfigStatusProvider;
@@ -21,7 +22,8 @@ import org.eclipse.smarthome.core.thing.Thing;
  * <li>{@link ConfigStatusProvider#supportsEntity(String)}</li>
  * <li>{@link ConfigStatusProvider#setConfigStatusCallback(ConfigStatusCallback)}</li>
  * </ul>
- * Furthermore it overwrites {@link ThingHandler#handleConfigurationUpdate(Map)} to initiate a propagation of a new
+ * Furthermore it overwrites {@link ThingHandler#handleConfigurationUpdate(Map)} and
+ * {@link BaseThingHandler#updateConfiguration(Configuration)} to initiate a propagation of a new
  * configuration status. So sub classes need only to provide the current configuration status by implementing
  * {@link ConfigStatusProvider#getConfigStatus()}.
  *
@@ -37,7 +39,7 @@ public abstract class ConfigStatusThingHandler extends BaseThingHandler implemen
      *
      * @param thing the thing for this handler
      */
-    public ConfigStatusThingHandler(Thing thing) {
+    public ConfigStatusThingHandler(@NonNull Thing thing) {
         super(thing);
     }
 

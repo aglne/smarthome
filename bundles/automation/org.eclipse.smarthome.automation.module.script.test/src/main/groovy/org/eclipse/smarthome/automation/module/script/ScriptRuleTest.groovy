@@ -33,8 +33,6 @@ import org.junit.Test
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import com.google.common.collect.Sets
-
 
 /**
  * This tests the script modules
@@ -65,7 +63,6 @@ class ScriptRuleTest extends OSGiTest {
         registerService(itemProvider)
         registerService(volatileStorageService)
 
-        enableItemAutoUpdate()
 
         def eventSubscriber = [
             receive: {  event ->
@@ -73,13 +70,11 @@ class ScriptRuleTest extends OSGiTest {
                 logger.info("received event from item {}, command {}", receivedEvent.itemName, receivedEvent.itemCommand)
             },
             getSubscribedEventTypes: {
-                Sets.newHashSet(ItemCommandEvent.TYPE)
+                Collections.singleton(ItemCommandEvent.TYPE)
             },
             getEventFilter: { null },
         ] as EventSubscriber
         registerService(eventSubscriber)
-        def scriptScopeProvider = getService(ScriptScopeProvider)
-        assertThat ScriptScopeProvider, is(notNullValue())
     }
 
 
@@ -97,7 +92,7 @@ class ScriptRuleTest extends OSGiTest {
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             def rule2 = ruleRegistry.get("javascript.rule1") as Rule
             assertThat rule2, is(notNullValue())
-            def ruleStatus2 = ruleRegistry.getStatus(rule2.uid) as RuleStatusInfo
+            def ruleStatus2 = ruleRegistry.getStatusInfo(rule2.uid) as RuleStatusInfo
             assertThat ruleStatus2.getStatus(), is(RuleStatus.IDLE)
         }, 10000, 200)
         def rule = ruleRegistry.get("javascript.rule1") as Rule
@@ -105,21 +100,21 @@ class ScriptRuleTest extends OSGiTest {
         assertThat rule.name, is("DemoScriptRule")
         def trigger = rule.triggers.find{it.id.equals("trigger")} as Trigger
         assertThat trigger, is(notNullValue())
-        assertThat trigger.typeUID, is("GenericEventTrigger")
+        assertThat trigger.typeUID, is("core.GenericEventTrigger")
         assertThat trigger.configuration.get("eventSource"), is ("MyTrigger")
         assertThat trigger.configuration.get("eventTopic"), is("smarthome/items/MyTrigger/state")
         assertThat trigger.configuration.get("eventTypes"), is("ItemStateEvent")
         def condition1 = rule.conditions.find{it.id.equals("condition")} as Condition
         assertThat condition1, is(notNullValue())
-        assertThat condition1.typeUID, is("ScriptCondition")
+        assertThat condition1.typeUID, is("script.ScriptCondition")
         assertThat condition1.configuration.get("type"), is("application/javascript")
-        assertThat condition1.configuration.get("script"), is("trigger.event.itemState==ON")
+        assertThat condition1.configuration.get("script"), is("event.itemState==ON")
         def action = rule.actions.find{it.id.equals("action")} as Action
         assertThat action, is(notNullValue())
-        assertThat action.typeUID, is("ScriptAction")
+        assertThat action.typeUID, is("script.ScriptAction")
         assertThat action.configuration.get("type"), is("application/javascript")
-        assertThat action.configuration.get("script"), is("print(items.MyTrigger), print(things.getAll()), print(trigger.event), events.sendCommand('ScriptItem', 'ON')")
-        def ruleStatus = ruleRegistry.getStatus(rule.uid) as RuleStatusInfo
+        assertThat action.configuration.get("script"), is("print(items.MyTrigger), print(things.getAll()), print(ctx.get('trigger.event')), events.sendCommand('ScriptItem', 'ON')")
+        def ruleStatus = ruleRegistry.getStatusInfo(rule.uid) as RuleStatusInfo
         assertThat ruleStatus.getStatus(), is(RuleStatus.IDLE)
 
         SwitchItem myTriggerItem = itemRegistry.getItem("MyTrigger")

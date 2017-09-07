@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -43,7 +43,7 @@ import com.google.common.collect.Lists;
  */
 public class ThingFactoryHelper {
 
-    private static Logger logger = LoggerFactory.getLogger(ThingFactory.class);
+    private static Logger logger = LoggerFactory.getLogger(ThingFactoryHelper.class);
 
     /**
      * Create {@link Channel} instances for the given Thing.
@@ -97,7 +97,7 @@ public class ThingFactoryHelper {
 
         ChannelBuilder channelBuilder = ChannelBuilder
                 .create(new ChannelUID(thingUID, groupId, channelDefinition.getId()), type.getItemType())
-                .withType(type.getUID()).withDefaultTags(type.getTags());
+                .withType(type.getUID()).withDefaultTags(type.getTags()).withKind(type.getKind());
 
         // If we want to override the label, add it...
         if (channelDefinition.getLabel() != null) {
@@ -159,8 +159,8 @@ public class ThingFactoryHelper {
                     return null;
             }
         } catch (NumberFormatException ex) {
-            LoggerFactory.getLogger(ThingFactory.class).warn("Could not parse default value '" + defaultValue
-                    + "' as type '" + parameterType + "': " + ex.getMessage(), ex);
+            LoggerFactory.getLogger(ThingFactory.class).warn("Could not parse default value '{}' as type '{}': {}",
+                    defaultValue, parameterType, ex.getMessage(), ex);
             return null;
         }
     }
@@ -179,7 +179,7 @@ public class ThingFactoryHelper {
             ConfigDescriptionRegistry configDescriptionRegistry) {
         if (configDescriptionRegistry != null && configuration != null) {
             // Set default values to thing-configuration
-            if (thingType.hasConfigDescriptionURI()) {
+            if (thingType.getConfigDescriptionURI() != null) {
                 ConfigDescription thingConfigDescription = configDescriptionRegistry
                         .getConfigDescription(thingType.getConfigDescriptionURI());
                 if (thingConfigDescription != null) {

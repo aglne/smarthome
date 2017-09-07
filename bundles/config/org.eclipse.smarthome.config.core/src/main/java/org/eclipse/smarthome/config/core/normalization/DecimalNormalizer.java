@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,16 +9,16 @@ package org.eclipse.smarthome.config.core.normalization;
 
 import java.math.BigDecimal;
 
+import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
+
 /**
- * Normalizer for the Decimal type.
- *
- * It converts all number types to BigDecimal, having at least one digit after the floating point.
- * Also {@link String}s are converted if possible.
+ * The normalizer for {@link ConfigDescriptionParameter.Type#DECIMAL}. It converts all number types to BigDecimal,
+ * having at least one digit after the floating point. Also {@link String}s are converted if possible.
  *
  * @author Simon Kaufmann - initial contribution and API.
- *
+ * @author Thomas Höfer - made class final and minor javadoc changes
  */
-class DecimalNormalizer extends AbstractNormalizer {
+final class DecimalNormalizer extends AbstractNormalizer {
 
     @Override
     public Object doNormalize(Object value) {

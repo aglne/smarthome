@@ -15,4 +15,16 @@ markdown: kramdown
 
 kramdown:
   input: GFM
-  enable_coderay: true
+
+defaults:
+  -
+    scope:
+      type: pages
+    values:
+      permalink: /:path/:basename:output_ext
+  -
+    scope:
+      type: posts
+    values:
+      excerpt_separator: <!--more-->
+      permalink: /blog/:year/:month/:day/:title.html

@@ -10,9 +10,12 @@
 		<description>The hue Bridge represents the Philips hue bridge.
 		</description>
 
+		<category>NetworkAppliance</category>
+
 		<properties>
 			<property name="vendor">Philips</property>
 		</properties>
+		<representation-property>serialNumber</representation-property>
 
 		<config-description>
 			<parameter name="ip" type="text">
@@ -40,6 +43,8 @@
 		<label>HUE Lamp</label>
 		<description>My own great HUE Lamp.</description>
 
+		<category>Lightbulb</category>
+
 		<channels>
 			<channel id="color" typeId="color">
 				<properties>
@@ -55,6 +60,7 @@
 			<property name="key1">value1</property>
 			<property name="key2">value2</property>
 		</properties>
+		<representation-property>uniqueId</representation-property>
 	</thing-type>
 
 	<!-- HUE Lamp with Group -->

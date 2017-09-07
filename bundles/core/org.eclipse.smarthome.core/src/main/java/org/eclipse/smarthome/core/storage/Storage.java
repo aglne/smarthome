@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,9 @@
 package org.eclipse.smarthome.core.storage;
 
 import java.util.Collection;
+
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 
 /**
  * A Storage is the generic way to store key-value pairs in ESH. Each Storage
@@ -20,12 +23,13 @@ public interface Storage<T> {
 
     /**
      * Puts a key-value mapping into this Storage.
-     * 
+     *
      * @param key the key to add
      * @param value the value to add
      * @return previous value for the key or null if no value was replaced
      */
-    T put(String key, T value);
+    @Nullable
+    T put(@NonNull String key, T value);
 
     /**
      * Removes the specified mapping from this map.
@@ -33,11 +37,20 @@ public interface Storage<T> {
      * @param key the mapping to remove
      * @return the removed value or null if no entry existed
      */
-    T remove(String key);
+    @Nullable
+    T remove(@NonNull String key);
+
+    /**
+     * Check if the storage contains a key.
+     *
+     * @param key the key
+     * @return true if the storage contains the key, otherwise false
+     */
+    boolean containsKey(@NonNull String key);
 
     /**
      * Gets the value mapped to the key specified.
-     * 
+     *
      * @param key the key
      * @return the mapped value, null if no match
      */
@@ -45,14 +58,14 @@ public interface Storage<T> {
 
     /**
      * Gets all keys of this Storage.
-     * 
+     *
      * @return the keys of this Storage
      */
     Collection<String> getKeys();
 
     /**
      * Gets all values of this Storage.
-     * 
+     *
      * @return the values of this Storage
      */
     Collection<T> getValues();

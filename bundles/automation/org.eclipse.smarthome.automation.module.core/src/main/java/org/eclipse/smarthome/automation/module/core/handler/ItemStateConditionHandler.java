@@ -28,11 +28,11 @@ import org.slf4j.LoggerFactory;
  * @author Kai Kreuzer - refactored and simplified customized module handling
  *
  */
-public class ItemStateConditionHandler extends BaseModuleHandler<Condition>implements ConditionHandler {
+public class ItemStateConditionHandler extends BaseModuleHandler<Condition> implements ConditionHandler {
 
     private final Logger logger = LoggerFactory.getLogger(ItemStateConditionHandler.class);
 
-    public static final String ITEM_STATE_CONDITION = "ItemStateCondition";
+    public static final String ITEM_STATE_CONDITION = "core.ItemStateCondition";
 
     private ItemRegistry itemRegistry;
 
@@ -72,7 +72,7 @@ public class ItemStateConditionHandler extends BaseModuleHandler<Condition>imple
     }
 
     @Override
-    public boolean isSatisfied(Map<String, ?> inputs) {
+    public boolean isSatisfied(Map<String, Object> inputs) {
         String itemName = (String) module.getConfiguration().get(ITEM_NAME);
         String state = (String) module.getConfiguration().get(STATE);
         String operator = (String) module.getConfiguration().get(OPERATOR);
@@ -89,29 +89,41 @@ public class ItemStateConditionHandler extends BaseModuleHandler<Condition>imple
             Item item = itemRegistry.getItem(itemName);
             State compareState = TypeParser.parseState(item.getAcceptedDataTypes(), state);
             State itemState = item.getState();
-            logger.debug("ItemStateCondition '" + module.getId() + "'checking if {} (State={}) {} {}", itemName,
-                    itemState, operator, compareState);
+            logger.debug("ItemStateCondition '{}'checking if {} (State={}) {} {}", module.getId(), itemName, itemState,
+                    operator, compareState);
             switch (operator) {
                 case "=":
-                    logger.debug("ConditionSatisfied --> " + itemState.equals(compareState));
+                    logger.debug("ConditionSatisfied --> {}", itemState.equals(compareState));
                     return itemState.equals(compareState);
                 case "!=":
                     return !itemState.equals(compareState);
                 case "<":
                     if (itemState instanceof DecimalType && compareState instanceof DecimalType) {
-                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) < 0 ? true : false;
+                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) < 0;
+                    }
+                    break;
+                case "<=":
+                case "=<":
+                    if (itemState instanceof DecimalType && compareState instanceof DecimalType) {
+                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) <= 0;
                     }
                     break;
                 case ">":
                     if (itemState instanceof DecimalType && compareState instanceof DecimalType) {
-                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) > 0 ? true : false;
+                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) > 0;
+                    }
+                    break;
+                case ">=":
+                case "=>":
+                    if (itemState instanceof DecimalType && compareState instanceof DecimalType) {
+                        return ((DecimalType) itemState).compareTo((DecimalType) compareState) >= 0;
                     }
                     break;
                 default:
                     break;
             }
         } catch (ItemNotFoundException e) {
-            logger.error("Item with Name " + itemName + " not found in itemRegistry");
+            logger.error("Item with Name {} not found in itemRegistry", itemName);
             return false;
         }
         return false;

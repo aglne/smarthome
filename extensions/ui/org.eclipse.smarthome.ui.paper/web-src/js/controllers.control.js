@@ -1,156 +1,168 @@
-angular.module('PaperUI.controllers.control', []).controller('ControlPageController', function($scope, $routeParams, $location, $timeout, itemRepository, thingService, thingTypeService, channelTypeService, thingConfigService) {
-    $scope.items = [];
-    $scope.selectedIndex = 0;
+angular.module('PaperUI.controllers.control', []) //
+.controller('ControlPageController', function($scope, $routeParams, $location, $timeout, $filter, itemRepository, thingTypeRepository, util, thingRepository, channelTypeRepository) {
     $scope.tabs = [];
-    $scope.things = [];
 
-    $scope.next = function() {
-        var newIndex = $scope.selectedIndex + 1;
-        if (newIndex > ($scope.tabs.length - 1)) {
-            newIndex = 0;
-        }
-        $scope.selectedIndex = newIndex;
-    }
-    $scope.prev = function() {
-        var newIndex = $scope.selectedIndex - 1;
-        if (newIndex < 0) {
-            newIndex = $scope.tabs.length - 1;
-        }
-        $scope.selectedIndex = newIndex;
+    $scope.navigateTo = function(path) {
+        $location.path(path);
     }
 
     $scope.refresh = function() {
-        itemRepository.getAll(function(items) {
-            $scope.tabs = [];
-            $scope.tabs.push({
-                name : 'all',
-                label : 'All'
-            });
-            $scope.items['All'] = items;
-            for (var int = 0; int < items.length; int++) {
-                var item = items[int];
-                if (item.tags.indexOf('home-group') > -1) {
-                    $scope.tabs.push({
-                        name : item.name,
-                        label : item.label
-                    });
-                }
-            }
+        itemRepository.getAll(function() {
+            channelTypeRepository.getAll(function() {
+                thingTypeRepository.getAll(function() {
+                    renderTabs();
+                }, true)
+            }, true)
         }, true);
     }
-    $scope.channelTypes = [];
-    $scope.thingTypes = [];
-    $scope.thingChannels = [];
-    $scope.isLoadComplete = false;
-    function getThings() {
-        thingService.getAll().$promise.then(function(things) {
-            $scope.things = things;
-            $scope.isLoadComplete = false;
-            thingTypeService.getAll().$promise.then(function(thingTypes) {
-                $scope.thingTypes = thingTypes;
-                channelTypeService.getAll().$promise.then(function(channels) {
-                    $scope.channelTypes = channels;
-                    for (var i = 0; i < $scope.things.length;) {
-                        var thingType = $.grep($scope.thingTypes, function(thingType, j) {
-                            return thingType.UID == $scope.things[i].thingTypeUID;
-                        })[0];
-                        $scope.things[i].thingChannels = thingConfigService.getThingChannels($scope.things[i], thingType, $scope.channelTypes, true);
-                        angular.forEach($scope.things[i].thingChannels, function(value, key) {
-                            $scope.things[i].thingChannels[key].channels = $.grep($scope.things[i].thingChannels[key].channels, function(channel, i) {
-                                return channel.linkedItems.length > 0;
-                            });
-                        });
-                        if (!thingHasChannels(i)) {
-                            $scope.things.splice(i, 1);
-                        } else {
-                            i++;
-                        }
-                    }
-                    $scope.isLoadComplete = true;
-                });
-            });
 
+    function renderTabs() {
+        thingRepository.getAll(function(things) {
+            $scope.tabs = getTabs(things);
+        })
+    }
+
+    function getTabs(things) {
+        if (!things) {
+            return [];
+        }
+
+        var locations = new Set();
+        angular.forEach(things, function(thing) {
+            var location = thing.location ? thing.location.toUpperCase() : 'OTHER'
+            thing.location = location
+            locations.add(location)
+        })
+
+        var renderedTabs = Array.from(locations)
+        renderedTabs = renderedTabs.sort(function(a, b) {
+            if (a === 'OTHER') {
+                return 1;
+            }
+            if (b === 'OTHER') {
+                return -1;
+            }
+
+            return a < b ? -1 : a > b ? 1 : 0
+        })
+
+        return renderedTabs.map(function(location) {
+            return {
+                name : location,
+                thingCount : 1
+            }
         });
     }
-    function thingHasChannels(index) {
-        for (var i = 0; i < $scope.things[index].thingChannels.length; i++) {
-            if ($scope.things[index].thingChannels[i].channels && $scope.things[index].thingChannels[i].channels.length > 0) {
-                return true;
-            }
+
+    $scope.refresh();
+
+}).controller('ControlController', function($scope, $timeout, $filter, itemService, util, $attrs, thingRepository, channelTypeRepository, thingTypeRepository, thingConfigService, imageService) {
+
+    var tabName = $scope.$parent.tab.name
+    var tabIndex = $scope.$parent.$index
+
+    $scope.things = [];
+    var renderedThings = []
+
+    var renderItems = function() {
+        var redraw;
+        thingRepository.getAll(function(things) {
+            var thingsForTab = things.filter(function(thing) {
+                var thingLocation = thing.location ? thing.location.toUpperCase() : 'OTHER'
+                return thingLocation === tabName;
+            })
+            channelTypeRepository.getAll(function(channelTypes) {
+                angular.forEach(thingsForTab, function(thing) {
+                    thingTypeRepository.getOne(function(thingType) {
+                        return thingType.UID === thing.thingTypeUID
+                    }, function(thingType) {
+                        var renderedThing = renderThing(thing, thingType, channelTypes);
+                        if (renderedThing) {
+                            renderedThings.push(renderedThing);
+                            renderedThings = renderedThings.sort(function(a, b) {
+                                return a.label < b.label ? -1 : a.label > b.label ? 1 : 0
+                            })
+                            $timeout.cancel(redraw)
+                            redraw = $timeout(function() {
+                                $scope.things = renderedThings;
+                                masonry()
+                            }, 0, true)
+                        }
+                    }, false)
+                })
+            }, false)
+        }, false)
+    }
+
+    var masonry = function() {
+        $timeout(function() {
+            new Masonry('#items-' + tabIndex, {});
+        }, 100, false);
+    }
+
+    function renderThing(thing, thingType, channelTypes) {
+        thing.thingChannels = thingConfigService.getThingChannels(thing, thingType, channelTypes, true);
+        angular.forEach(thing.thingChannels, function(thingChannel) {
+            thingChannel.channels = thingChannel.channels.filter(function(channel) {
+                return channel.linkedItems.length > 0;
+            });
+        });
+
+        var hasChannels = false;
+        angular.forEach(thing.thingChannels, function(channelGroup) {
+            angular.forEach(channelGroup.channels, function(channel) {
+                channel.items = getItems(channel.linkedItems)
+                hasChannels = true;
+            })
+        })
+
+        if (hasChannels) {
+            return thing;
         }
-        return false;
     }
 
-    $scope.getItem = function(itemName) {
-        for (var int = 0; int < $scope.data.items.length; int++) {
-            var item = $scope.data.items[int];
-            if (item.name === itemName) {
-                return item;
-            }
-        }
-        return null;
-    }
+    var getItems = function(itemNames) {
+        var items = $scope.data.items.filter(function(item) {
+            return itemNames.indexOf(item.name) >= 0
+        })
+        angular.forEach(items, function(item) {
 
-    $scope.getThingsForTab = function(tabName) {
-        $scope.things = thingService.getAll();
-    }
-
-    $scope.getItemsForTab = function(tabName) {
-        var items = []
-        if (tabName === 'all') {
-            for (var int = 0; int < $scope.data.items.length; int++) {
-                var item = $scope.data.items[int];
-                if (item.tags.indexOf('thing') > -1) {
-                    items.push(item);
+            if (item.type && (item.type == "Number" || item.groupType == "Number" || item.type == "Rollershutter")) {
+                var parsedValue = Number(item.state);
+                if (isNaN(parsedValue)) {
+                    item.state = null;
+                } else {
+                    item.state = parsedValue;
                 }
             }
-            return items;
-        } else {
-            return this.getItem(tabName).members;
-        }
+            if (item.type && item.type == "Image") {
+                imageService.getItemState(item.name).then(function(state) {
+                    item.state = state;
+                    item.imageLoaded = true;
+                });
+                item.imageLoaded = false;
+            }
+            item.stateText = util.getItemStateText(item);
+
+            item.readOnly = isReadOnly(item);
+        })
+
+        return items;
     }
 
-    $scope.masonry = function() {
-        if ($scope.data.items) {
-            $timeout(function() {
-                var itemContainer = '#items-' + $scope.selectedIndex;
-                new Masonry(itemContainer, {});
-            }, 100, true);
-        }
+    var isReadOnly = function(item) {
+        return item.stateDescription ? item.stateDescription.readOnly : false;
     }
-    $scope.$on('ngRepeatFinished', function(ngRepeatFinishedEvent) {
-        $scope.masonry();
-    });
-    $scope.refresh();
-    getThings();
-
-}).controller('ControlController', function($scope, $timeout, $filter, itemService) {
 
     $scope.getItemName = function(itemName) {
         return itemName.replace(/_/g, ' ');
-    }
-
-    $scope.getStateText = function(item) {
-        if (item.state === 'NULL' || item.state === 'UNDEF') {
-            return '-';
-        }
-        var state = item.type === 'NumberItem' ? parseFloat(item.state) : item.state;
-
-        if (item.type === 'DateTimeItem') {
-            var date = new Date(item.state);
-            return $filter('date')(date, "dd.MM.yyyy hh:mm:ss");
-        } else if (!item.stateDescription || !item.stateDescription.pattern) {
-            return state;
-        } else {
-            return sprintf(item.stateDescription.pattern, state);
-        }
     }
 
     $scope.getMinText = function(item) {
         if (!item.stateDescription || isNaN(item.stateDescription.minimum)) {
             return '';
         } else if (!item.stateDescription.pattern) {
-            return item.stateDescription.minimum;
+            return '' + item.stateDescription.minimum;
         } else {
             return sprintf(item.stateDescription.pattern, item.stateDescription.minimum);
         }
@@ -160,7 +172,7 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         if (!item.stateDescription || isNaN(item.stateDescription.maximum)) {
             return '';
         } else if (!item.stateDescription.pattern) {
-            return item.stateDescription.maximum;
+            return '' + item.stateDescription.maximum;
         } else {
             return sprintf(item.stateDescription.pattern, item.stateDescription.maximum);
         }
@@ -177,7 +189,8 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         'Contact' : {},
         'DimmableLight' : {
             label : 'Brightness',
-            icon : 'wb_incandescent'
+            icon : 'wb_incandescent',
+            showSwitch : true
         },
         'CarbonDioxide' : {
             label : 'CO2'
@@ -203,8 +216,7 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         'Smoke' : {},
         'SoundVolume' : {
             label : 'Volume',
-            icon : 'volume_up',
-            hideSwitch : true
+            icon : 'volume_up'
         },
         'Switch' : {},
         'Temperature' : {
@@ -216,46 +228,40 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         'Zoom' : {},
     }
 
-    $scope.getLabel = function(itemCategory, label, defaultLabel) {
-        if (label) {
-            return label;
+    $scope.getLabel = function(item, defaultLabel) {
+        if (item.name) {
+            return item.label;
         }
 
-        if (itemCategory) {
-            var category = categories[itemCategory];
+        if (item.category) {
+            var category = categories[item.category];
             if (category) {
-                return category.label ? category.label : itemCategory;
+                return category.label ? category.label : item.category;
             } else {
                 return defaultLabel;
             }
-        } else {
-            return defaultLabel;
         }
+
+        return defaultLabel;
     }
+
     $scope.getIcon = function(itemCategory, fallbackIcon) {
         var defaultIcon = fallbackIcon ? fallbackIcon : 'radio_button_unchecked';
-        if (itemCategory) {
-            var category = categories[itemCategory];
-            if (category) {
-                return category.icon ? category.icon : defaultIcon;
-            } else {
-                return defaultIcon;
-            }
-        } else {
-            return defaultIcon;
+
+        if (itemCategory && categories[itemCategory] && categories[itemCategory].icon) {
+            return categories[itemCategory].icon
         }
+
+        return defaultIcon;
     }
-    $scope.isHideSwitch = function(itemCategory) {
+    $scope.showSwitch = function(itemCategory) {
         if (itemCategory) {
             var category = categories[itemCategory];
             if (category) {
-                return category.hideSwitch;
+                return category.showSwitch;
             }
         }
         return false;
-    }
-    $scope.isReadOnly = function(item) {
-        return item.stateDescription ? item.stateDescription.readOnly : false;
     }
 
     /**
@@ -267,7 +273,10 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     $scope.isOptionList = function(item) {
         return (item.stateDescription != null && item.stateDescription.options.length > 0)
     }
-}).controller('ItemController', function($rootScope, $scope, itemService) {
+
+    renderItems()
+
+}).controller('ItemController', function($rootScope, $scope, itemService, util) {
     $scope.editMode = false;
     $scope.sendCommand = function(command, updateState) {
         $rootScope.itemUpdates[$scope.item.name] = new Date().getTime();
@@ -277,6 +286,7 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         if (updateState) {
             $scope.item.state = command;
         }
+        $scope.item.stateText = util.getItemStateText($scope.item);
     };
     $scope.editState = function() {
         $scope.editMode = true;
@@ -286,9 +296,24 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         $scope.editMode = false;
     };
 }).controller('DefaultItemController', function($scope, itemService) {
-
+    $scope.longEditMode = $scope.shortEditMode = false;
     $scope.optionListChanged = function() {
         $scope.sendCommand($scope.item.state, false);
+    };
+    $scope.editState = function(shortField) {
+        if (shortField) {
+            $scope.shortEditMode = true;
+        } else {
+            $scope.longEditMode = true;
+        }
+    };
+    $scope.updateState = function(shortField) {
+        $scope.sendCommand($scope.item.state, false);
+        if (shortField) {
+            $scope.shortEditMode = false;
+        } else {
+            $scope.longEditMode = false;
+        }
     };
 
 }).controller('ImageItemController', function($scope, itemService) {
@@ -300,6 +325,9 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     };
 
 }).controller('SwitchItemController', function($scope, $timeout, itemService) {
+    if ($scope.item.state === 'UNDEF' || $scope.item.state === 'NULL') {
+        $scope.item.state = '-';
+    }
     $scope.setOn = function(state) {
         $scope.sendCommand(state);
     }
@@ -345,6 +373,9 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     });
 }).controller('ColorItemController', function($scope, $timeout, $element, itemService) {
 
+    if ($scope.item.state === 'UNDEF' || $scope.item.state === 'NULL') {
+        $scope.item.state = '-';
+    }
     function getStateAsObject(state) {
         var stateParts = state.split(",");
         if (stateParts.length == 3) {
@@ -369,15 +400,11 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     $scope.pending = false;
 
     $scope.setBrightness = function(brightness) {
-        // send updates every 300 ms only
+        $scope.brightness = brightness;
         if (!$scope.pending) {
             $timeout(function() {
-                var stateObject = getStateAsObject($scope.item.state);
-                stateObject.b = $scope.brightness === 0 ? '0' : $scope.brightness;
-                stateObject.s = $scope.saturation === 0 ? '0' : $scope.saturation;
-                stateObject.h = $scope.hue === 0 ? '0' : $scope.hue;
-                $scope.item.state = toState(stateObject);
-                $scope.sendCommand($scope.item.state);
+                var command = isNaN($scope.brightness) ? '0' : $scope.brightness;
+                $scope.sendCommand(command);
                 $scope.pending = false;
             }, 300);
             $scope.pending = true;
@@ -385,36 +412,29 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
     }
 
     $scope.setHue = function(hue) {
+        $scope.hue = hue;
+        setColor();
+    }
+
+    $scope.setSaturation = function(saturation) {
+        $scope.saturation = saturation;
+        setColor();
+    }
+
+    function setColor() {
         // send updates every 300 ms only
         if (!$scope.pending) {
             $timeout(function() {
                 var stateObject = getStateAsObject($scope.item.state);
-                stateObject.h = $scope.hue === 0 ? '0' : $scope.hue;
-                stateObject.b = $scope.brightness === 0 ? '0' : $scope.brightness;
-                stateObject.s = $scope.saturation === 0 ? '0' : $scope.saturation;
-                if ($scope.item.state == "UNDEF" || $scope.item.state === 'NULL') {
+                stateObject.b = isNaN($scope.brightness) ? '0' : $scope.brightness;
+                stateObject.s = isNaN($scope.saturation) ? '0' : $scope.saturation;
+                stateObject.h = isNaN($scope.hue) ? '0' : $scope.hue;
+                if ($scope.item.state == "UNDEF" || $scope.item.state === 'NULL' || $scope.item.state === '-') {
                     stateObject.b = 100;
                     stateObject.s = 100;
                     $scope.brightness = stateObject.b;
                     $scope.saturation = stateObject.s;
                 }
-                $scope.item.state = toState(stateObject);
-                $scope.sendCommand($scope.item.state);
-                $scope.pending = false;
-            }, 300);
-            $scope.pending = true;
-        }
-
-    }
-
-    $scope.setSaturation = function(saturation) {
-        // send updates every 300 ms only
-        if (!$scope.pending) {
-            $timeout(function() {
-                var stateObject = getStateAsObject($scope.item.state);
-                stateObject.s = $scope.saturation === 0 ? '0' : $scope.saturation;
-                stateObject.b = $scope.brightness === 0 ? '0' : $scope.brightness;
-                stateObject.h = $scope.hue === 0 ? '0' : $scope.hue;
                 $scope.item.state = toState(stateObject);
                 $scope.sendCommand($scope.item.state);
                 $scope.pending = false;
@@ -456,27 +476,56 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
 
     var hexColor = $scope.getHexColor();
     $($element).find('.hue .md-thumb').css('background-color', hexColor);
-}).controller('NumberItemController', function($scope) {
-    $scope.shouldRenderSlider = function(item) {
-        if (item.stateDescription) {
-            var stateDescription = item.stateDescription;
-            if (stateDescription.readOnly) {
-                return false;
-            } else {
-                if (isNaN(stateDescription.minimum) || isNaN(stateDescription.maximum)) {
-                    return false;
-                } else {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 }).controller('RollershutterItemController', function($scope) {
     if ($scope.item.state === 'UNDEF' || $scope.item.state === 'NULL') {
         $scope.item.state = '-';
     }
-}).controller('PlayerItemController', function($scope) {
+}).controller('PlayerItemController', function($scope, $timeout) {
+
+    var isInterrupted, time;
+    $scope.onPrevDown = function() {
+        isInterrupted = false;
+        time = new Date().getTime();
+        $timeout(function() {
+            if (!isInterrupted) {
+                $scope.sendCommand('REWIND');
+            }
+        }, 300);
+    }
+
+    $scope.onPrevUp = function() {
+        var newTime = new Date().getTime();
+        if (time + 300 > newTime) {
+            isInterrupted = true;
+            $scope.sendCommand('PREVIOUS');
+        } else {
+            $timeout(function() {
+                $scope.sendCommand('PLAY');
+            });
+        }
+    }
+
+    $scope.onNextDown = function() {
+        isInterrupted = false;
+        time = new Date().getTime();
+        $timeout(function() {
+            if (!isInterrupted) {
+                $scope.sendCommand('FASTFORWARD');
+            }
+        }, 300);
+    }
+
+    $scope.onNextUp = function() {
+        var newTime = new Date().getTime();
+        if (time + 300 > newTime) {
+            isInterrupted = true;
+            $scope.sendCommand('NEXT');
+        } else {
+            $timeout(function() {
+                $scope.sendCommand('PLAY');
+            });
+        }
+    }
 
 }).controller('LocationItemController', function($scope, $sce) {
     $scope.init = function() {
@@ -486,7 +535,7 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
             var bbox = (longitude - 0.01) + ',' + (latitude - 0.01) + ',' + (longitude + 0.01) + ',' + (latitude + 0.01);
             var marker = latitude + ',' + longitude;
             $scope.formattedState = latitude + '°N ' + longitude + '°E';
-            $scope.url = $sce.trustAsResourceUrl('http://www.openstreetmap.org/export/embed.html?bbox=' + bbox + '&marker=' + marker);
+            $scope.url = $sce.trustAsResourceUrl('https://www.openstreetmap.org/export/embed.html?bbox=' + bbox + '&marker=' + marker);
         } else {
             $scope.formattedState = '- °N - °E';
         }
@@ -495,4 +544,9 @@ angular.module('PaperUI.controllers.control', []).controller('ControlPageControl
         $scope.init();
     });
     $scope.init();
-});
+}).directive('itemStateDropdown', function() {
+    return {
+        restrict : 'A',
+        templateUrl : "partials/item.state.dropdown.html"
+    };
+})

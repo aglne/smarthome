@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -18,9 +18,14 @@ import org.eclipse.smarthome.core.items.ItemNotFoundException
 import org.eclipse.smarthome.core.items.ItemRegistry
 import org.eclipse.smarthome.core.items.ManagedItemProvider
 import org.eclipse.smarthome.core.items.ManagedItemProvider.PersistedItem
+import org.eclipse.smarthome.core.library.items.NumberItem
 import org.eclipse.smarthome.core.library.items.StringItem
 import org.eclipse.smarthome.core.library.items.SwitchItem
+import org.eclipse.smarthome.core.library.types.OnOffType;
 import org.eclipse.smarthome.core.library.types.StringType
+import org.eclipse.smarthome.core.library.types.ArithmeticGroupFunction.And
+import org.eclipse.smarthome.core.library.types.ArithmeticGroupFunction.Avg
+import org.eclipse.smarthome.core.library.types.ArithmeticGroupFunction.Sum
 import org.eclipse.smarthome.core.types.Command
 import org.eclipse.smarthome.core.types.State
 import org.eclipse.smarthome.test.OSGiTest
@@ -211,7 +216,7 @@ class ManagedItemProviderOSGiTest extends OSGiTest {
 
         Storage storage = storageService.getStorage(Item.class.getName())
         StrangeItem item = new StrangeItem('SomeStrangeItem')
-        String key = itemProvider.keyToString(itemProvider.getKey(item))
+        String key = itemProvider.keyToString(item.getUID())
 
         // put an item into the storage that cannot be handled (yet)
         PersistedItem persistableElement = storage.put(key, itemProvider.toPersistableElement(item))
@@ -251,8 +256,8 @@ class ManagedItemProviderOSGiTest extends OSGiTest {
         GroupItem groupItem = new GroupItem('SomeGroupItem')
         item.addGroupName(groupItem.getName())
         groupItem.addMember(item)
-        String itemKey = itemProvider.keyToString(itemProvider.getKey(item))
-        String groupKey = itemProvider.keyToString(itemProvider.getKey(groupItem))
+        String itemKey = itemProvider.keyToString(item.getUID())
+        String groupKey = itemProvider.keyToString(groupItem.getUID())
 
         // put items into the storage that cannot be handled (yet)
         PersistedItem persistableElement1 = storage.put(itemKey, itemProvider.toPersistableElement(item))
@@ -288,5 +293,63 @@ class ManagedItemProviderOSGiTest extends OSGiTest {
         } finally {
             unregisterService(factory)
         }
+    }
+
+    @Test
+    void 'assert functions are stored and retrieved as well'() {
+
+        assertThat itemProvider.getAll().size(), is(0)
+
+        def item1 = new GroupItem('GroupItem', new NumberItem(), new Avg())
+        itemProvider.add item1
+
+        def items = itemProvider.getAll()
+        assertThat items.size(), is(1)
+
+        GroupItem result1 = itemProvider.remove 'GroupItem'
+
+        assertThat result1.name, is('GroupItem')
+        assertThat result1.function, is(Avg)
+
+        assertThat itemProvider.getAll().size(), is(0)
+    }
+
+
+    @Test
+    void 'assert group functions are stored and retrieved as well'() {
+
+        assertThat itemProvider.getAll().size(), is(0)
+
+        def function1 = new And(OnOffType.ON, OnOffType.OFF)
+        def function2 = new Sum()
+        def item1 = new GroupItem('GroupItem1', new SwitchItem('Switch'), function1)
+        def item2 = new GroupItem('GroupItem2', new NumberItem(), function2)
+
+        assertThat item1.name, is('GroupItem1')
+        assertThat item1.function, isA(And.class)
+        assertThat item1.function.parameters, is([OnOffType.ON, OnOffType.OFF] as State[])
+
+        assertThat item2.name, is('GroupItem2')
+        assertThat item2.function, isA(Sum.class)
+        assertThat item2.function.parameters, is([] as State[])
+
+        itemProvider.add item1
+        itemProvider.add item2
+
+        def items = itemProvider.getAll()
+        assertThat items.size(), is(2)
+
+        def result1 = itemProvider.remove 'GroupItem1'
+        def result2 = itemProvider.remove 'GroupItem2'
+
+        assertThat result1.name, is('GroupItem1')
+        assertThat result1.function, isA(And.class)
+        assertThat result1.function.parameters, is([OnOffType.ON, OnOffType.OFF] as State[])
+
+        assertThat result2.name, is('GroupItem2')
+        assertThat result2.function, isA(Sum.class)
+        assertThat result2.function.parameters, is([] as State[])
+
+        assertThat itemProvider.getAll().size(), is(0)
     }
 }

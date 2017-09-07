@@ -1,16 +1,15 @@
----
-layout: documentation
----
-
-{% include base.html %}
-
 # FS Internet Radio Binding
 
 This binding integrates internet radios based on the [Frontier Silicon chipset](http://www.frontier-silicon.com/).
 
 ## Supported Things
 
-Successfully tested are internet radios [Hama IR100](https://de.hama.com/00054823/hama-internetradio-ir110), [Medion MD87180](http://internetradio.medion.com/), and [MEDION MD86988](http://internetradio.medion.com/).
+Successfully tested are internet radios 
+ * [Hama IR100](https://de.hama.com/00054823/hama-internetradio-ir110)
+ * [Medion MD87180](http://internetradio.medion.com/)
+ * [MEDION MD86988](http://internetradio.medion.com/)
+ * [Roberts Stream 93i](https://www.robertsradio.com/uk/products/radio/smart-radio/stream-93i)
+ * [auna Connect 150](http://www.auna.de/HiFi-Geraete/Radios/Internetradios/auna-Connect-150-BK-2-1-Internetradio-Mediaplayer-schwarz.html)
 
 But in principle, all internet radios based on the [Frontier Silicon chipset](http://www.frontier-silicon.com/) should be supported because they share the same API.
 
@@ -63,11 +62,13 @@ The radio mode depends on the internet radio model (and probably its firmware ve
 ## Full Example
 
 demo.things:
+
 ```
 fsinternetradio:radio:radioInKitchen [ ip="192.168.0.42" ]
 ```
 
 demo.items:
+
 ```
 Switch RadioPower "Radio Power" { channel="fsinternetradio:radio:radioInKitchen:power" }
 Switch RadioMute "Radio Mute" { channel="fsinternetradio:radio:radioInKitchen:mute" }
@@ -79,6 +80,7 @@ String RadioInfo2 "Radio Info2" { channel="fsinternetradio:radio:radioInKitchen:
 ```
 
 demo.sitemap:
+
 ```
 sitemap demo label="Main Menu"
 {

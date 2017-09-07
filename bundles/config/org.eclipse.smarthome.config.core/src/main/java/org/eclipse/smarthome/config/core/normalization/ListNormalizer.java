@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -11,18 +11,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Normalizer for configuration parameters allowing multiple values.
+ * The normalizer for configuration parameters allowing multiple values. It converts all collections/arrays to a
+ * {@link List} and applies the underlying normalizer to each of the values inside that list.
  *
- * It converts all collections/arrays to a {@link List} and applies the
- * underlying normalizer to each of the values inside that list.
- * 
  * @author Simon Kaufmann - initial contribution and API.
+ * @author Thomas Höfer - made class final and minor javadoc changes
  */
-class ListNormalizer extends AbstractNormalizer {
+final class ListNormalizer extends AbstractNormalizer {
 
-    private INormalizer delegate;
+    private Normalizer delegate;
 
-    ListNormalizer(INormalizer delegate) {
+    ListNormalizer(Normalizer delegate) {
         this.delegate = delegate;
     }
 
@@ -55,7 +54,7 @@ class ListNormalizer extends AbstractNormalizer {
             }
             return ret;
         }
-        throw new IllegalArgumentException();
+        return value;
     }
 
     static boolean isList(Object value) {

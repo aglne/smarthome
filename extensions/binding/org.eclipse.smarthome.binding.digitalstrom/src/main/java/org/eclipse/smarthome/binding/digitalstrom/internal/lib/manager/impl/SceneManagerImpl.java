@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -112,7 +112,7 @@ public class SceneManagerImpl implements SceneManager {
                     try {
                         sceneId = Short.parseShort(sceneStr);
                     } catch (java.lang.NumberFormatException e) {
-                        logger.error("An exception occurred, while handling event at parsing sceneID: " + sceneStr, e);
+                        logger.error("An exception occurred, while handling event at parsing sceneID: {}", sceneStr, e);
                     }
                 }
 
@@ -144,6 +144,10 @@ public class SceneManagerImpl implements SceneManager {
     }
 
     private boolean isEcho(String dsid, short sceneId) {
+        // sometimes the dS-event have a dSUID saved in the dSID
+        if (structureManager.getDeviceByDSUID(dsid) != null) {
+            dsid = structureManager.getDeviceByDSUID(dsid).getDSID().getValue();
+        }
         String echo = dsid + "-" + sceneId;
         return isEcho(echo);
     }

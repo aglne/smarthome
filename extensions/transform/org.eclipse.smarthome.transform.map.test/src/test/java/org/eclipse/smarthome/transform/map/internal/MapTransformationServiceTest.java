@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
@@ -45,6 +46,11 @@ public class MapTransformationServiceTest {
             protected String getSourcePath() {
                 return BASE_FOLDER + File.separator + super.getSourcePath();
             }
+
+            @Override
+            protected Locale getLocale() {
+                return Locale.US;
+            }
         };
         FileUtils.deleteDirectory(new File(CONFIG_FOLDER));
         FileUtils.copyDirectory(new File(SRC_FOLDER), new File(CONFIG_FOLDER));
@@ -58,10 +64,10 @@ public class MapTransformationServiceTest {
         Assert.assertEquals("zu", transformedResponse);
 
         Properties properties = new Properties();
-        try {
-            properties.load(new FileReader(USED_FILENAME));
+        try (FileReader reader = new FileReader(USED_FILENAME); FileWriter writer = new FileWriter(USED_FILENAME)) {
+            properties.load(reader);
             properties.setProperty(SOURCE_CLOSED, "changevalue");
-            properties.store(new FileWriter(USED_FILENAME), "");
+            properties.store(writer, "");
 
             // This tests that the requested transformation file has been removed from
             // the cache
@@ -75,7 +81,7 @@ public class MapTransformationServiceTest {
             }, 10000, 100);
 
             properties.setProperty(SOURCE_CLOSED, "zu");
-            properties.store(new FileWriter(USED_FILENAME), "");
+            properties.store(writer, "");
 
             waitForAssert(new Callable<Void>() {
                 @Override

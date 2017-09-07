@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -181,8 +181,8 @@ class ThingFactoryTest extends OSGiTest{
         ChannelDefinition channelDef1 = new ChannelDefinition("ch1", channelType1.UID)
         ChannelDefinition channelDef2 = new ChannelDefinition("ch2", channelType2.UID)
 
-        ChannelGroupType channelGroupType1 = new ChannelGroupType(new ChannelGroupTypeUID("bindingid:groupTypeId1"), false, "label", "description", [channelDef1, channelDef2])
-        ChannelGroupType channelGroupType2 = new ChannelGroupType(new ChannelGroupTypeUID("bindingid:groupTypeId2"), false, "label", "description", [channelDef1])
+        ChannelGroupType channelGroupType1 = new ChannelGroupType(new ChannelGroupTypeUID("bindingid:groupTypeId1"), false, "label", "description", "myCategory1", [channelDef1, channelDef2])
+        ChannelGroupType channelGroupType2 = new ChannelGroupType(new ChannelGroupTypeUID("bindingid:groupTypeId2"), false, "label", "description", "myCategory2", [channelDef1])
 
         ChannelGroupDefinition channelGroupDef1 = new ChannelGroupDefinition("group1", channelGroupType1.UID)
         ChannelGroupDefinition channelGroupDef2 = new ChannelGroupDefinition("group2", channelGroupType2.UID)

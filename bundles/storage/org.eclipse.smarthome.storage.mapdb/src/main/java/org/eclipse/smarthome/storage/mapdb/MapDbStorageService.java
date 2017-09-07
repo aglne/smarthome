@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,7 +10,8 @@ package org.eclipse.smarthome.storage.mapdb;
 import java.io.File;
 
 import org.eclipse.smarthome.config.core.ConfigConstants;
-import org.eclipse.smarthome.core.storage.Storage;
+import org.eclipse.smarthome.core.storage.DeletableStorage;
+import org.eclipse.smarthome.core.storage.DeletableStorageService;
 import org.eclipse.smarthome.core.storage.StorageService;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -23,8 +24,9 @@ import org.slf4j.LoggerFactory;
  *
  * @author Thomas.Eichstaedt-Engelen - Initial Contribution and API
  * @author Alex Tugarev - Added getStorage for name only
+ * @author Markus Rathgeb - Use {@link DeletableStorageService}
  */
-public class MapDbStorageService implements StorageService {
+public class MapDbStorageService implements DeletableStorageService {
 
     private final Logger logger = LoggerFactory.getLogger(MapDbStorageService.class);
 
@@ -56,12 +58,12 @@ public class MapDbStorageService implements StorageService {
     }
 
     @Override
-    public <T> Storage<T> getStorage(String name, ClassLoader classLoader) {
+    public <T> DeletableStorage<T> getStorage(String name, ClassLoader classLoader) {
         return new MapDbStorage<T>(db, name, classLoader);
     }
 
     @Override
-    public <T> Storage<T> getStorage(String name) {
+    public <T> DeletableStorage<T> getStorage(String name) {
         return getStorage(name, null);
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -54,14 +54,17 @@ class ThingTypesTest extends OSGiTest {
 
         def bridgeType = thingTypes.find { it.toString().equals("hue:bridge") } as BridgeType
         assertThat bridgeType, is(notNullValue())
+        assertThat bridgeType.category, is("NetworkAppliance")
         assertThat bridgeType.listed, is(false)
         assertThat bridgeType.label, is("HUE Bridge")
         assertThat bridgeType.description, is("The hue Bridge represents the Philips hue bridge.")
         assertThat bridgeType.properties.size(), is(1)
         assertThat bridgeType.properties.get("vendor"), is("Philips")
+        assertThat bridgeType.representationProperty, is("serialNumber")
 
         def thingType = thingTypes.find { it.toString().equals("hue:lamp") } as ThingType
         assertThat thingType, is(notNullValue())
+        assertThat thingType.category, is("Lightbulb")
         assertThat thingType.listed, is(false)
         assertThat thingType.label, is("HUE Lamp")
         assertThat thingType.description, is("My own great HUE Lamp.")
@@ -70,6 +73,7 @@ class ThingTypesTest extends OSGiTest {
         assertThat thingType.properties.size(), is(2)
         assertThat thingType.properties.get("key1"), is("value1")
         assertThat thingType.properties.get("key2"), is("value2")
+        assertThat thingType.representationProperty, is("uniqueId")
         thingType.channelDefinitions.with {
             assertThat size(), is(3)
             def colorChannel = it.find { it.id.equals("color") } as ChannelDefinition
@@ -140,6 +144,7 @@ class ThingTypesTest extends OSGiTest {
 
         thingType = thingTypes.find { it.toString().equals("hue:lamp-with-group") } as ThingType
         assertThat thingType.properties.size(), is(0)
+        assertThat thingType.category, is(null)
         assertThat thingType.listed, is(true)
 
         // uninstall test bundle

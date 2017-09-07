@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -69,8 +69,8 @@ public class ItemUpdater extends AbstractItemEventSubscriber {
                 if (isAccepted) {
                     item.setState(newState);
                 } else {
-                    logger.debug("Received update of a not accepted type (" + newState.getClass().getSimpleName()
-                            + ") for item " + itemName);
+                    logger.debug("Received update of a not accepted type ({}) for item {}",
+                            newState.getClass().getSimpleName(), itemName);
                 }
             } catch (ItemNotFoundException e) {
                 logger.debug("Received update for non-existing item: {}", e.getMessage());

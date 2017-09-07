@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -9,8 +9,11 @@ package org.eclipse.smarthome.storage.mapdb;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.smarthome.core.storage.DeletableStorage;
 import org.eclipse.smarthome.core.storage.Storage;
 import org.mapdb.DB;
 import org.slf4j.Logger;
@@ -28,13 +31,15 @@ import com.google.gson.GsonBuilder;
  *
  * @author Thomas.Eichstaedt-Engelen - Initial Contribution and API
  * @author Alex Tugarev - Loading with Class.forName() if classLoader is null
+ * @author Markus Rathgeb - Made the MapDB storage a disposable one
  */
-public class MapDbStorage<T> implements Storage<T> {
+public class MapDbStorage<T> implements DeletableStorage<T> {
 
     private static final String TYPE_SEPARATOR = "@@@";
 
     private final Logger logger = LoggerFactory.getLogger(MapDbStorage.class);
 
+    private final String name;
     private DB db;
     private ClassLoader classLoader;
     private Map<String, String> map;
@@ -42,15 +47,22 @@ public class MapDbStorage<T> implements Storage<T> {
     private transient Gson mapper;
 
     public MapDbStorage(DB db, String name, ClassLoader classLoader) {
+        this.name = name;
         this.db = db;
         this.classLoader = classLoader;
         this.map = db.createTreeMap(name).makeOrGet();
         this.mapper = new GsonBuilder().registerTypeAdapterFactory(new PropertiesTypeAdapterFactory()).create();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    public void delete() {
+        map = null;
+        if (db != null) {
+            db.delete(name);
+            db = null;
+        }
+    }
+
     @Override
     public T put(String key, T value) {
         String previousValue = map.put(key, serialize(value));
@@ -58,9 +70,6 @@ public class MapDbStorage<T> implements Storage<T> {
         return deserialize(previousValue);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public T remove(String key) {
         String removedElement = map.remove(key);
@@ -68,25 +77,21 @@ public class MapDbStorage<T> implements Storage<T> {
         return deserialize(removedElement);
     }
 
-    /**
-     * {@inheritDoc}
-     */
+    @Override
+    public boolean containsKey(final @NonNull String key) {
+        return map.containsKey(key);
+    }
+
     @Override
     public T get(String key) {
         return deserialize(map.get(key));
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Collection<String> getKeys() {
-        return map.keySet();
+        return new HashSet<>(map.keySet());
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Collection<T> getValues() {
         Collection<T> values = new ArrayList<T>();
@@ -101,7 +106,7 @@ public class MapDbStorage<T> implements Storage<T> {
      * of {@code value} while
      * deserializing it afterwards we prepend its qualified type name to the
      * JSON String.
-     * 
+     *
      * @param value the {@code value} to store
      * @return the JSON document prepended with the qualified type name of {@code value}
      */
@@ -124,7 +129,7 @@ public class MapDbStorage<T> implements Storage<T> {
      * given JSON String. A special classloader (other than the one of the
      * MapDB bundle) is used in order to load the classes in the context of
      * the calling bundle.
-     * 
+     *
      * @param json
      * @return
      */

@@ -11,6 +11,7 @@ import java.util.Set;
 
 import org.eclipse.smarthome.automation.Rule;
 import org.eclipse.smarthome.automation.Visibility;
+import org.eclipse.smarthome.core.common.registry.Identifiable;
 
 /**
  * The templates define types of shared, ready to use rule definitions, which
@@ -26,7 +27,7 @@ import org.eclipse.smarthome.automation.Visibility;
  * @author Ana Dimova - Initial Contribution
  * @author Vasil Ilchev - Initial Contribution
  */
-public interface Template {
+public interface Template extends Identifiable<String> {
 
     /**
      * This method is used for getting the type of Template. It is unique in scope
@@ -34,12 +35,15 @@ public interface Template {
      *
      * @return the unique id of Template.
      */
+    @Override
     public String getUID();
 
     /**
      * Templates can have
+     * <ul>
      * <li><code>tags</code> - non-hierarchical keywords or terms for describing them. The tags are
-     * used to filter the templates. This method is used for getting the assign tags to this Template.
+     * used to filter the templates. This method is used for getting the assign tags to this Template.</li>
+     * </ul>
      *
      * @return tags of the template
      */

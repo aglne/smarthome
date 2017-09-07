@@ -36,6 +36,7 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
     $scope.refresh = function() {
         discoveryResultRepository.getAll(true);
     };
+
 }).controller('InboxEntryController', function($scope, $mdDialog, $q, inboxService, discoveryResultRepository, thingTypeRepository, thingService, toastService, thingRepository) {
     $scope.approve = function(thingUID, thingTypeUID, event) {
         $mdDialog.show({
@@ -94,6 +95,31 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
             });
         });
     };
+    $scope.bindings;
+    $scope.$watch("data.discoveryResults", function(results) {
+        if (results) {
+            refreshBindings();
+        }
+    })
+    function refreshBindings() {
+        $scope.bindings = [];
+        if ($scope.data && $scope.data.discoveryResults && $scope.data.bindings && $scope.data.bindings.length > 0) {
+            var arr = [];
+            for (var i = 0; i < $scope.data.bindings.length; i++) {
+                var a = $.grep($scope.data.discoveryResults, function(result) {
+                    return result.bindingType == $scope.data.bindings[i].id;
+                });
+                if (a.length > 0) {
+                    $scope.bindings.push($scope.data.bindings[i]);
+                }
+
+            }
+        }
+    }
+    $scope.clearAll = function() {
+        $scope.searchText = "";
+        $scope.$broadcast("ClearFilters");
+    }
 }).controller('ScanDialogController', function($scope, $rootScope, $timeout, $mdDialog, discoveryService, bindingRepository) {
     $scope.supportedBindings = [];
     $scope.activeScans = [];
@@ -102,14 +128,16 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $scope.activeScans.push(bindingId);
         discoveryService.scan({
             'bindingId' : bindingId
-        }, function() {
-
+        }, function(response) {
+            var timeout = parseInt(response.timeout);
+            timeout = (!isNaN(timeout) ? timeout : 3) * 1000;
+            setTimeout(function() {
+                $scope.$apply(function() {
+                    $scope.activeScans.splice($scope.activeScans.indexOf(bindingId), 1)
+                });
+            }, timeout);
         });
-        setTimeout(function() {
-            $scope.$apply(function() {
-                $scope.activeScans.splice($scope.activeScans.indexOf(bindingId), 1)
-            });
-        }, 3000);
+
     };
 
     bindingRepository.getAll();
@@ -146,30 +174,11 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $mdDialog.cancel();
     }
     $scope.approve = function(label) {
-        var selectedGroupNames = [];
-        for ( var groupName in $scope.groupNames) {
-            if ($scope.groupNames[groupName]) {
-                selectedGroupNames.push(groupName);
-            }
-        }
         $mdDialog.hide({
-            label : label,
-            groupNames : selectedGroupNames
+            label : label
         });
     }
-}).controller('ManualSetupChooseController', function($scope, bindingRepository, thingTypeRepository, thingService) {
-    $scope.setSubtitle([ 'Manual Setup' ]);
-    $scope.setHeaderText('Choose a thing, which should be aded manually to your Smart Home.')
-
-    $scope.currentBindingId = null;
-    $scope.setCurrentBindingId = function(bindingId) {
-        $scope.currentBindingId = bindingId;
-    };
-
-    bindingRepository.getAll(function(data) {
-    });
-
-}).controller('ManualSetupConfigureController', function($scope, $routeParams, $mdDialog, toastService, bindingRepository, thingTypeRepository, thingService, thingRepository, configService, linkService) {
+}).controller('ManualSetupConfigureController', function($scope, $routeParams, $mdDialog, $location, toastService, bindingRepository, thingTypeService, thingService, thingRepository, configService, linkService) {
 
     var thingTypeUID = $routeParams.thingTypeUID;
 
@@ -182,7 +191,6 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         });
         return uuid;
     }
-    ;
 
     $scope.thingType = null;
     $scope.thing = {
@@ -198,19 +206,13 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
     $scope.addThing = function(thing) {
         thing.thingTypeUID = thingTypeUID;
         thing.UID = thing.thingTypeUID + ":" + thing.ID;
+        thing.configuration = configService.setConfigDefaults(thing.configuration, $scope.parameters, true);
         thingService.add(thing, function() {
             toastService.showDefaultToast('Thing added.', 'Show Thing', 'configuration/things/view/' + thing.UID);
-            $scope.navigateTo('setup/search/' + $scope.thingType.UID.split(':')[0]);
+            window.localStorage.setItem('thingUID', thing.UID);
+            $location.path('configuration/things');
         });
     };
-
-    function linkChannel(channelUID) {
-        var itemName = channelUID.replace(/:/g, "_");
-        linkService.link({
-            itemName : itemName,
-            channelUID : channelUID
-        });
-    }
 
     $scope.needsBridge = false;
     $scope.bridges = [];
@@ -229,8 +231,8 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         });
     };
 
-    thingTypeRepository.getOne(function(thingType) {
-        return thingType.UID === thingTypeUID;
+    thingTypeService.getByUid({
+        thingTypeUID : thingTypeUID
     }, function(thingType) {
         $scope.setTitle('Configure ' + thingType.label);
         $scope.setHeaderText(thingType.description);
@@ -257,12 +259,23 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
     $scope.filter = function(discoveryResult) {
         return $scope.showIgnored || discoveryResult.flag === 'NEW';
     }
-}).controller('SetupWizardBindingsController', function($scope, bindingRepository) {
+    $scope.areEntriesIgnored = function(discoveryResults) {
+        return $.grep(discoveryResults, function(discoveryResult) {
+            return discoveryResult.flag === 'IGNORED';
+        }).length > 0;
+    }
+}).controller('SetupWizardBindingsController', function($scope, bindingRepository, discoveryService) {
     $scope.setSubtitle([ 'Choose Binding' ]);
     $scope.setHeaderText('Choose a Binding for which you want to add new things.');
     bindingRepository.getAll();
     $scope.selectBinding = function(bindingId) {
-        $scope.navigateTo('setup/search/' + bindingId);
+        discoveryService.getAll(function(supportedBindings) {
+            if (supportedBindings.indexOf(bindingId) >= 0) {
+                $scope.navigateTo('setup/search/' + bindingId);
+            } else {
+                $scope.navigateTo('setup/thing-types/' + bindingId);
+            }
+        });
     }
 }).controller('SetupWizardSearchBindingController', function($scope, discoveryResultRepository, discoveryService, thingTypeRepository, bindingRepository) {
     $scope.showIgnored = false;
@@ -281,8 +294,6 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         if (supportedBindings.indexOf($scope.bindingId) >= 0) {
             $scope.discoverySupported = true;
             $scope.scan($scope.bindingId);
-        } else {
-            $scope.discoverySupported = false;
         }
     });
 
@@ -294,13 +305,16 @@ angular.module('PaperUI.controllers.setup', []).controller('SetupPageController'
         $scope.scanning = true;
         discoveryService.scan({
             'bindingId' : bindingId
-        }, function() {
+        }, function(response) {
+            var timeout = parseInt(response.timeout);
+            timeout = (!isNaN(timeout) ? timeout : 10) * 1000;
+            setTimeout(function() {
+                $scope.$apply(function() {
+                    $scope.scanning = false;
+                });
+            }, timeout);
         });
-        setTimeout(function() {
-            $scope.$apply(function() {
-                $scope.scanning = false;
-            });
-        }, 10000);
+
     };
 
     $scope.refresh = function() {

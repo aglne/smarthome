@@ -14,7 +14,7 @@ import static org.junit.Assert.*
 import static org.junit.matchers.JUnitMatchers.*
 
 import org.eclipse.smarthome.automation.Action
-import org.eclipse.smarthome.automation.Condition
+import org.eclipse.smarthome.automation.ManagedRuleProvider
 import org.eclipse.smarthome.automation.Rule
 import org.eclipse.smarthome.automation.RuleRegistry
 import org.eclipse.smarthome.automation.RuleStatus
@@ -23,18 +23,16 @@ import org.eclipse.smarthome.automation.Trigger
 import org.eclipse.smarthome.automation.events.RuleStatusInfoEvent
 import org.eclipse.smarthome.automation.type.ActionType
 import org.eclipse.smarthome.automation.type.Input
-import org.eclipse.smarthome.automation.type.ModuleType
 import org.eclipse.smarthome.automation.type.ModuleTypeRegistry
 import org.eclipse.smarthome.automation.type.Output
 import org.eclipse.smarthome.automation.type.TriggerType
-import org.eclipse.smarthome.core.autoupdate.AutoUpdateBindingConfigProvider
 import org.eclipse.smarthome.core.events.Event
 import org.eclipse.smarthome.core.events.EventPublisher
 import org.eclipse.smarthome.core.events.EventSubscriber
 import org.eclipse.smarthome.core.items.ItemProvider
 import org.eclipse.smarthome.core.items.ItemRegistry
+import org.eclipse.smarthome.core.items.events.ItemCommandEvent
 import org.eclipse.smarthome.core.items.events.ItemEventFactory
-import org.eclipse.smarthome.core.items.events.ItemStateEvent
 import org.eclipse.smarthome.core.library.items.SwitchItem
 import org.eclipse.smarthome.core.library.types.OnOffType
 import org.eclipse.smarthome.core.storage.StorageService
@@ -44,10 +42,6 @@ import org.eclipse.smarthome.test.storage.VolatileStorageService
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.osgi.framework.Bundle
-import org.osgi.framework.FrameworkEvent
-import org.osgi.framework.FrameworkListener
-import org.osgi.service.packageadmin.PackageAdmin
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -61,16 +55,15 @@ import com.google.common.collect.Sets
  * @author Marin Mitev - make the test to pass on each run
  *
  */
-@SuppressWarnings("deprecation")
 class AutomationIntegrationJsonTest extends OSGiTest{
 
     final Logger logger = LoggerFactory.getLogger(AutomationIntegrationJsonTest.class)
     def EventPublisher eventPublisher
     def ItemRegistry itemRegistry
     def RuleRegistry ruleRegistry
+    def ManagedRuleProvider managedRuleProvider
     def ModuleTypeRegistry moduleTypeRegistry
     def Event ruleEvent
-    def PackageAdmin pkgAdmin
 
     public static def VolatileStorageService VOLATILE_STORAGE_SERVICE = new VolatileStorageService()//keep storage with rules imported from json files
 
@@ -101,15 +94,6 @@ class AutomationIntegrationJsonTest extends OSGiTest{
         registerService(itemProvider)
         registerVolatileStorageService()
 
-        //        enableItemAutoUpdate()
-        def autoupdateConfig = [
-            autoUpdate: { String itemName ->
-                println "AutoUpdate Item -> " + itemName
-                return true }
-
-        ] as AutoUpdateBindingConfigProvider
-        registerService(autoupdateConfig)
-
         def ruleEventHandler = [
             receive: { Event e ->
                 logger.info("RuleEvent: " + e.topic + " --> " + e.payload)
@@ -130,19 +114,19 @@ class AutomationIntegrationJsonTest extends OSGiTest{
         registerService(ruleEventHandler)
 
         def StorageService storageService = getService(StorageService)
+        managedRuleProvider = getService(ManagedRuleProvider)
         eventPublisher = getService(EventPublisher)
         itemRegistry = getService(ItemRegistry)
         ruleRegistry = getService(RuleRegistry)
         moduleTypeRegistry = getService(ModuleTypeRegistry)
-        pkgAdmin = getService(PackageAdmin)
         waitForAssert ({
             assertThat storageService, is(notNullValue())
 
             assertThat eventPublisher, is(notNullValue()) //sometimes assert fails because EventPublisher service is null
             assertThat itemRegistry, is(notNullValue())
             assertThat ruleRegistry, is(notNullValue())
+            assertThat managedRuleProvider, is(notNullValue())
             assertThat moduleTypeRegistry, is(notNullValue())
-            assertThat pkgAdmin, is(notNullValue())
         }, 9000)
         logger.info('@Before.finish');
     }
@@ -163,8 +147,8 @@ class AutomationIntegrationJsonTest extends OSGiTest{
 
         //WAIT until module type resources are parsed
         waitForAssert({
-            assertThat moduleTypeRegistry.getAll(TriggerType.class).isEmpty(), is(false)
-            assertThat moduleTypeRegistry.getAll(ActionType.class).isEmpty(), is(false)
+            assertThat moduleTypeRegistry.getTriggers().isEmpty(), is(false)
+            assertThat moduleTypeRegistry.getActions().isEmpty(), is(false)
 
             def moduleType1 = moduleTypeRegistry.get("CustomTrigger1") as TriggerType
             def moduleType2 = moduleTypeRegistry.get("CustomTrigger2") as TriggerType
@@ -204,7 +188,7 @@ class AutomationIntegrationJsonTest extends OSGiTest{
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             def rule2 = ruleRegistry.getAll().find{it.tags!=null && it.tags.contains("jsonTest") && !it.tags.contains("references")} as Rule
             assertThat rule2, is(notNullValue())
-            def ruleStatus2 = ruleRegistry.getStatus(rule2.uid) as RuleStatusInfo
+            def ruleStatus2 = ruleRegistry.getStatusInfo(rule2.uid) as RuleStatusInfo
             assertThat ruleStatus2.getStatus(), is(RuleStatus.IDLE)
         }, 10000, 200)
         def rule = ruleRegistry.getAll().find{it.tags!=null && it.tags.contains("jsonTest") && !it.tags.contains("references")} as Rule
@@ -215,34 +199,34 @@ class AutomationIntegrationJsonTest extends OSGiTest{
         assertTrue rule.tags.any{it == "rule"}
         def trigger = rule.triggers.find{it.id.equals("ItemStateChangeTriggerID")} as Trigger
         assertThat trigger, is(notNullValue())
-        assertThat trigger.typeUID, is("GenericEventTrigger")
+        assertThat trigger.typeUID, is("core.GenericEventTrigger")
         assertThat trigger.configuration.get("eventSource"), is ("myMotionItem")
         assertThat trigger.configuration.get("eventTopic"), is("smarthome/items/*")
         assertThat trigger.configuration.get("eventTypes"), is("ItemStateEvent")
-        def condition1 = rule.conditions.find{it.id.equals("ItemStateConditionID")} as Condition
-        assertThat condition1, is(notNullValue())
-        assertThat condition1.typeUID, is("EventCondition")
-        assertThat condition1.configuration.get("topic"), is("smarthome/items/myMotionItem/state")
-        assertThat condition1.configuration.get("payload"), is(".*ON.*")
+        //        def condition1 = rule.conditions.find{it.id.equals("ItemStateConditionID")} as Condition
+        //        assertThat condition1, is(notNullValue())
+        //        assertThat condition1.typeUID, is("core.GenericEventCondition")
+        //        assertThat condition1.configuration.get("topic"), is("smarthome/items/myMotionItem/state")
+        //        assertThat condition1.configuration.get("payload"), is(".*ON.*")
         def action = rule.actions.find{it.id.equals("ItemPostCommandActionID")} as Action
         assertThat action, is(notNullValue())
-        assertThat action.typeUID, is("ItemPostCommandAction")
+        assertThat action.typeUID, is("core.ItemCommandAction")
         assertThat action.configuration.get("itemName"), is("myLampItem")
         assertThat action.configuration.get("command"), is("ON")
-        def ruleStatus = ruleRegistry.getStatus(rule.uid) as RuleStatusInfo
+        def ruleStatus = ruleRegistry.getStatusInfo(rule.uid) as RuleStatusInfo
         assertThat ruleStatus.getStatus(), is(RuleStatus.IDLE)
     }
 
     @Test
-    public void 'assert that a rule from json file is added automatically with resolved module references' () {
-        logger.info("assert that a rule from json file is added automatically with resolved module references");
+    public void 'assert that a rule from json file is added automatically and the runtime rule has resolved module references' () {
+        logger.info("assert that a rule from json file is added automatically and the runtime rule has resolved module references");
 
         //WAIT until Rule modules types are parsed and the rule becomes IDLE
         waitForAssert({
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             def rule2 = ruleRegistry.getAll().find{it.tags!=null && it.tags.contains("jsonTest") && it.tags.contains("references")} as Rule
             assertThat rule2, is(notNullValue())
-            def ruleStatus2 = ruleRegistry.getStatus(rule2.uid) as RuleStatusInfo
+            def ruleStatus2 = ruleRegistry.getStatusInfo(rule2.uid) as RuleStatusInfo
             assertThat ruleStatus2.getStatus(), is(RuleStatus.IDLE)
         }, 10000, 200)
         def rule = ruleRegistry.getAll().find{it.tags!=null && it.tags.contains("jsonTest") && it.tags.contains("references")} as Rule
@@ -254,22 +238,46 @@ class AutomationIntegrationJsonTest extends OSGiTest{
         assertTrue rule.tags.any{it == "references"}
         def trigger = rule.triggers.find{it.id.equals("ItemStateChangeTriggerID")} as Trigger
         assertThat trigger, is(notNullValue())
-        assertThat trigger.typeUID, is("GenericEventTrigger")
-        assertThat trigger.configuration.get("eventSource"), is ("myMotionItem")
+        assertThat trigger.typeUID, is("core.GenericEventTrigger")
         assertThat trigger.configuration.get("eventTopic"), is("smarthome/items/*")
         assertThat trigger.configuration.get("eventTypes"), is("ItemStateEvent")
-        def condition1 = rule.conditions.find{it.id.equals("ItemStateConditionID")} as Condition
-        assertThat condition1, is(notNullValue())
-        assertThat condition1.typeUID, is("EventCondition")
-        assertThat condition1.configuration.get("topic"), is("smarthome/items/myMotionItem/state")
-        assertThat condition1.configuration.get("payload"), is(".*ON.*")
+        //        def condition1 = rule.conditions.find{it.id.equals("ItemStateConditionID")} as Condition
+        //        assertThat condition1, is(notNullValue())
+        //        assertThat condition1.typeUID, is("core.GenericEventCondition")
+        //        assertThat condition1.configuration.get("topic"), is("smarthome/items/myMotionItem/state")
+        //        assertThat condition1.configuration.get("payload"), is(".*ON.*")
         def action = rule.actions.find{it.id.equals("ItemPostCommandActionID")} as Action
         assertThat action, is(notNullValue())
-        assertThat action.typeUID, is("ItemPostCommandAction")
-        assertThat action.configuration.get("itemName"), is("myLampItem")
+        assertThat action.typeUID, is("core.ItemCommandAction")
         assertThat action.configuration.get("command"), is("ON")
-        def ruleStatus = ruleRegistry.getStatus(rule.uid) as RuleStatusInfo
+        def ruleStatus = ruleRegistry.getStatusInfo(rule.uid) as RuleStatusInfo
         assertThat ruleStatus.getStatus(), is(RuleStatus.IDLE)
+
+        // run the rule to check if the runtime rule has resolved module references and is executed successfully
+        def EventPublisher eventPublisher = getService(EventPublisher)
+        Event itemEvent = null
+
+        def itemEventHandler = [
+            receive: {  Event e ->
+                logger.info("Event: " + e.topic)
+                if (e.topic.contains("myLampItem")){
+                    itemEvent=e
+                }
+            },
+
+            getSubscribedEventTypes: {
+                Sets.newHashSet(ItemCommandEvent.TYPE)
+            },
+
+            getEventFilter:{ null }
+
+        ] as EventSubscriber
+
+        registerService(itemEventHandler)
+        eventPublisher.post(ItemEventFactory.createStateEvent("myMotionItem", OnOffType.ON))
+        waitForAssert ({ assertThat itemEvent, is(notNullValue())} , 3000, 100)
+        assertThat itemEvent.topic, is(equalTo("smarthome/items/myLampItem/command"))
+        assertThat (((ItemCommandEvent)itemEvent).itemCommand, is(OnOffType.ON))
     }
 
     @Test
@@ -279,11 +287,11 @@ class AutomationIntegrationJsonTest extends OSGiTest{
             assertThat ruleRegistry.getAll().isEmpty(), is(false)
             Rule r = ruleRegistry.get("ItemSampleRule")
             assertThat r, is(notNullValue())
-            assertThat ruleRegistry.getStatus(r.UID).getStatus(), is(RuleStatus.IDLE)
+            assertThat ruleRegistry.getStatusInfo(r.UID).getStatus(), is(RuleStatus.IDLE)
 
-        }, 3000, 200)
+        }, 9000, 200)
         SwitchItem myPresenceItem = itemRegistry.getItem("myPresenceItem")
-        eventPublisher.post(ItemEventFactory.createCommandEvent("myPresenceItem", OnOffType.ON))
+        myPresenceItem.setState(OnOffType.ON)
         SwitchItem myLampItem = itemRegistry.getItem("myLampItem")
         assertThat myLampItem.getState(), is(UnDefType.NULL)
         SwitchItem myMotionItem = itemRegistry.getItem("myMotionItem")
@@ -291,183 +299,19 @@ class AutomationIntegrationJsonTest extends OSGiTest{
         def eventHandler = [
             receive: { Event e ->
                 logger.info("Event: " + e.topic)
-                if (e.topic == "smarthome/items/myLampItem/state"){
+                if (e.topic == "smarthome/items/myLampItem/command"){
                     event=e
                 }
             },
             getSubscribedEventTypes: {
-                Sets.newHashSet(ItemStateEvent.TYPE)
+                Sets.newHashSet(ItemCommandEvent.TYPE)
             },
             getEventFilter:{ null }
         ] as EventSubscriber
         registerService(eventHandler)
-        eventPublisher.post(ItemEventFactory.createCommandEvent("myMotionItem", OnOffType.ON))
-        waitForAssert ({
-            assertThat (myLampItem.getState(), is(OnOffType.ON))
-            assertThat event, is(notNullValue())
-            assertThat event.topic, is(equalTo("smarthome/items/myLampItem/state"))
-        }, 9000, 100)
-
-        assertThat event.topic, is(equalTo("smarthome/items/myLampItem/state"))
-        assertThat (((ItemStateEvent)event).itemState, is(OnOffType.ON))
-
-
-    }
-
-    @Test
-    public void 'asserting that the host-fragment support works correctly' () {
-        logger.info('asserting that the host-fragment support works correctly')
-
-        // first install the host
-        Bundle testAutomationProviderHost = bundleContext.installBundle('automation.test.host', getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.host.jar"))
-        testAutomationProviderHost.start()
-        assertThat testAutomationProviderHost.getState(), is(Bundle.ACTIVE)
-
-        // assert that the host resources are loaded
-        waitForAssert({
-            assertThat ruleRegistry.getAll().isEmpty(), is(false)
-            Rule r = ruleRegistry.get("AutomationTestHostRule")
-            assertThat r, is(notNullValue())
-            ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(notNullValue())
-        }, 3000, 200)
-
-        // then install the fragment
-        Bundle testAutomationProviderFragmet = bundleContext.installBundle('automation.test.fragment', getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.fragment.jar"))
-        assertThat testAutomationProviderFragmet.getState(), is(Bundle.RESOLVED)
-
-        // assert that the host and fragment resources are loaded
-        waitForAssert({
-            assertThat ruleRegistry.getAll().isEmpty(), is(false)
-            Rule r = ruleRegistry.get("AutomationTestFragmentRule")
-            assertThat r, is(notNullValue())
-            ModuleType m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(notNullValue())
-            m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(notNullValue())
-        }, 3000, 200)
-
-        // first uninstall the host
-        testAutomationProviderHost.uninstall()
-        assertThat testAutomationProviderHost.getState(), is(Bundle.UNINSTALLED)
-
-        // assert that the host and fragment resources are removed
-        waitForAssert({
-            ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(nullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(nullValue())
-        }, 3000, 200)
-
-        // uninstall the fragment
-        testAutomationProviderFragmet.uninstall()
-        assertThat testAutomationProviderFragmet.getState(), is(Bundle.UNINSTALLED)
-
-        // first install the fragment
-        testAutomationProviderFragmet = bundleContext.installBundle('automation.test.fragment', getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.fragment.jar"))
-        assertThat testAutomationProviderFragmet.getState(), is(Bundle.INSTALLED)
-
-        // assert that the host and fragment resources are not loaded
-        waitForAssert({
-            ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(nullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(nullValue())
-        }, 3000, 200)
-
-        // then install the host
-        testAutomationProviderHost = bundleContext.installBundle('automation.test.host', getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.host.jar"))
-        testAutomationProviderHost.start()
-
-        // assert that the host and fragment resources are loaded
-        waitForAssert({
-            assertThat testAutomationProviderHost.getState(), is(Bundle.ACTIVE)
-            assertThat testAutomationProviderFragmet.getState(), is(Bundle.RESOLVED)
-            ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(notNullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(notNullValue())
-        }, 3000, 200)
-
-        testAutomationProviderFragmet.update(getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.fragment_updated.jar"))
-
-        def waiting = true
-        Bundle[] bundles = [testAutomationProviderHost, testAutomationProviderFragmet] as Bundle[]
-        def FrameworkListener listener1 = new FrameworkListener() {
-                    public void frameworkEvent(FrameworkEvent event) {
-                        waiting = false
-                        assertThat testAutomationProviderHost.getState(), is(Bundle.ACTIVE)
-                        assertThat testAutomationProviderFragmet.getState(), is(Bundle.RESOLVED)
-                        ModuleType m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-                        assertThat m, is(notNullValue())
-                        m = moduleTypeRegistry.get("AutomationTestFragmentAction")
-                        assertThat m, is(notNullValue())
-                        m = moduleTypeRegistry.get("AutomationTestHostAction")
-                        assertThat m, is(notNullValue())
-                    }
-                }
-        bundleContext.addFrameworkListener(listener1);
-        pkgAdmin.refreshPackages(bundles)
-        while ({
-            sleep(3000)
-            waiting == true
-        }()) continue
-
-            testAutomationProviderHost.update(getClass().getClassLoader().getResourceAsStream("src/test/resources/automation.test.host_updated.jar"))
-
-        waitForAssert({
-            assertThat testAutomationProviderHost.getState(), is(Bundle.ACTIVE)
-            assertThat testAutomationProviderFragmet.getState(), is(Bundle.RESOLVED)
-            ModuleType m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(notNullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentAction")
-            assertThat m, is(notNullValue())
-            m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(notNullValue())
-            m = moduleTypeRegistry.get("AutomationTestHostTrigger")
-            assertThat m, is(notNullValue())
-        }, 3000, 200)
-
-        // first uninstall the fragment
-        testAutomationProviderFragmet.uninstall()
-        assertThat testAutomationProviderFragmet.getState(), is(Bundle.UNINSTALLED)
-        waiting = true
-        def FrameworkListener listener2 = new FrameworkListener() {
-                    public void frameworkEvent(FrameworkEvent event) {
-                        waiting = false
-                        // assert that the host is updated and only its resources are available
-                        ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-                        assertThat m, is(notNullValue())
-                        m = moduleTypeRegistry.get("AutomationTestHostTrigger")
-                        assertThat m, is(notNullValue())
-                        m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-                        assertThat m, is(nullValue())
-                        m = moduleTypeRegistry.get("AutomationTestFragmentAction")
-                        assertThat m, is(nullValue())
-                    }
-                }
-        bundleContext.addFrameworkListener(listener2);
-        pkgAdmin.refreshPackages(bundles)
-        while ({
-            sleep(3000)
-            waiting == true
-        }()) continue
-
-            // then uninstall the host
-            testAutomationProviderHost.uninstall()
-        assertThat testAutomationProviderHost.getState(), is(Bundle.UNINSTALLED)
-
-        // assert that the host resources also are removed
-        waitForAssert({
-            ModuleType m = moduleTypeRegistry.get("AutomationTestHostAction")
-            assertThat m, is(nullValue())
-            m = moduleTypeRegistry.get("AutomationTestHostTrigger")
-            assertThat m, is(nullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentTrigger")
-            assertThat m, is(nullValue())
-            m = moduleTypeRegistry.get("AutomationTestFragmentAction")
-            assertThat m, is(nullValue())
-        }, 3000, 200)
+        eventPublisher.post(ItemEventFactory.createStateEvent("myMotionItem", OnOffType.ON))
+        waitForAssert ({assertThat event, is(notNullValue())})
+        assertThat (((ItemCommandEvent)event).itemCommand, is(OnOffType.ON))
 
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014 openHAB UG (haftungsbeschr??nkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -23,6 +23,7 @@ import org.eclipse.xtext.xbase.interpreter.IEvaluationContext
 import org.eclipse.xtext.xbase.interpreter.impl.XbaseInterpreter
 import org.eclipse.xtext.xbase.jvmmodel.IJvmModelAssociations
 import org.eclipse.xtext.common.types.JvmIdentifiableElement
+import org.eclipse.xtext.xbase.XExpression
 
 /**
  * The script interpreter handles ESH specific script components, which are not known
@@ -111,5 +112,12 @@ public class ScriptInterpreter extends XbaseInterpreter {
 			super._assignValueTo(jvmField, assignment, value, context, indicator)
 		}
 	}
+	
+    override protected doEvaluate(XExpression expression, IEvaluationContext context, CancelIndicator indicator) {
+        if (expression == null) {
+            return null
+        }
+        return super.doEvaluate(expression, context, indicator)
+    }
 
 }

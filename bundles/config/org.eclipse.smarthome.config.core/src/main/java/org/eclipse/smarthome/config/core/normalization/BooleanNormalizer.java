@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Deutsche Telekom AG and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -7,21 +7,21 @@
  */
 package org.eclipse.smarthome.config.core.normalization;
 
+import org.eclipse.smarthome.config.core.ConfigDescriptionParameter;
+
 import com.google.common.base.Strings;
 
 /**
- * Normalizer for the Boolean type.
- *
- * It tries to convert the given type into a {@link Boolean} object.
+ * The normalizer for {@link ConfigDescriptionParameter.Type#BOOLEAN}. It tries to convert the given value into a
+ * {@link Boolean} object.
  * <p>
  * Therefore it considers numbers (0/1 and their {@link String} representations) as well as {@link Strings}, containing
- * apart from the typical "true"/"false" also
- * other values like "yes"/"no", "on"/"off".
+ * apart from the typical "true"/"false" also other values like "yes"/"no", "on"/"off".
  *
  * @author Simon Kaufmann - initial contribution and API.
- *
+ * @author Thomas Höfer - made class final and minor javadoc changes
  */
-class BooleanNormalizer extends AbstractNormalizer {
+final class BooleanNormalizer extends AbstractNormalizer {
 
     @Override
     public Object doNormalize(Object value) {

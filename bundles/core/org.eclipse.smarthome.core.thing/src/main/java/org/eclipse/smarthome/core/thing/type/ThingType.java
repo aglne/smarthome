@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.smarthome.config.core.ConfigDescription;
 import org.eclipse.smarthome.core.thing.ChannelUID;
 import org.eclipse.smarthome.core.thing.Thing;
@@ -30,21 +32,25 @@ import org.eclipse.smarthome.core.thing.ThingTypeUID;
  * @author Dennis Nobel - Initial Contribution
  * @author Thomas Höfer - Added thing and thing type properties
  * @author Simon Kaufmann - Added listed field
+ * @author Andre Fuechsel - Added representationProperty field
+ * @author Stefan Triller - Added category field
  */
 public class ThingType extends AbstractDescriptionType {
 
     private final List<ChannelGroupDefinition> channelGroupDefinitions;
     private final List<ChannelDefinition> channelDefinitions;
     private final List<String> supportedBridgeTypeUIDs;
-    private final Map<String, String> properties;
-    private URI configDescriptionURI;
-    private boolean listed;
+    private final Map<@NonNull String, String> properties;
+    private final String representationProperty;
+    private final URI configDescriptionURI;
+    private final boolean listed;
+    private String category;
 
     /**
      * @see ThingType#ThingType(ThingTypeUID, List, String, String, List, List, Map, URI)
      */
     public ThingType(String bindingId, String thingTypeId, String label) throws IllegalArgumentException {
-        this(new ThingTypeUID(bindingId, thingTypeId), null, label, null, true, null, null, null, null);
+        this(new ThingTypeUID(bindingId, thingTypeId), null, label, null, null, true, null, null, null, null, null);
     }
 
     /**
@@ -52,23 +58,16 @@ public class ThingType extends AbstractDescriptionType {
      *
      * @param uid the unique identifier which identifies this Thing type within the overall system
      *            (must neither be null, nor empty)
-     *
      * @param supportedBridgeTypeUIDs the unique identifiers of the bridges this Thing type supports
      *            (could be null or empty)
-     *
      * @param label the human readable label for the according type
      *            (must neither be null nor empty)
-     *
      * @param description the human readable description for the according type
      *            (could be null or empty)6
-     *
      * @param channelDefinitions the channels this Thing type provides (could be null or empty)
-     *
      * @param channelGroupDefinitions the channel groups defining the channels this Thing type
      *            provides (could be null or empty)
-     *
      * @param properties the properties this Thing type provides (could be null)
-     *
      * @param configDescriptionURI the link to the concrete ConfigDescription (could be null)
      *
      * @throws IllegalArgumentException
@@ -77,8 +76,8 @@ public class ThingType extends AbstractDescriptionType {
     public ThingType(ThingTypeUID uid, List<String> supportedBridgeTypeUIDs, String label, String description,
             List<ChannelDefinition> channelDefinitions, List<ChannelGroupDefinition> channelGroupDefinitions,
             Map<String, String> properties, URI configDescriptionURI) throws IllegalArgumentException {
-        this(uid, supportedBridgeTypeUIDs, label, description, true, channelDefinitions, channelGroupDefinitions,
-                properties, configDescriptionURI);
+        this(uid, supportedBridgeTypeUIDs, label, description, null, true, null, channelDefinitions,
+                channelGroupDefinitions, properties, configDescriptionURI);
     }
 
     /**
@@ -86,38 +85,63 @@ public class ThingType extends AbstractDescriptionType {
      *
      * @param uid the unique identifier which identifies this Thing type within the overall system
      *            (must neither be null, nor empty)
-     *
      * @param supportedBridgeTypeUIDs the unique identifiers of the bridges this Thing type supports
      *            (could be null or empty)
-     *
      * @param label the human readable label for the according type
      *            (must neither be null nor empty)
-     *
      * @param description the human readable description for the according type
-     *            (could be null or empty)6
-     *
-     * @param listed detemines whether it should be listed for manually pairing or not
-     *
+     *            (could be null or empty)
+     * @param category provides information about the thing for filtering
+     * @param listed determines whether it should be listed for manually pairing or not
      * @param channelDefinitions the channels this Thing type provides (could be null or empty)
-     *
      * @param channelGroupDefinitions the channel groups defining the channels this Thing type
      *            provides (could be null or empty)
-     *
      * @param properties the properties this Thing type provides (could be null)
-     *
      * @param configDescriptionURI the link to the concrete ConfigDescription (could be null)
      *
      * @throws IllegalArgumentException
      *             if the UID is null or empty, or the the meta information is null
      */
     public ThingType(ThingTypeUID uid, List<String> supportedBridgeTypeUIDs, String label, String description,
-            boolean listed, List<ChannelDefinition> channelDefinitions,
+            String category, boolean listed, List<ChannelDefinition> channelDefinitions,
+            List<ChannelGroupDefinition> channelGroupDefinitions, Map<String, String> properties,
+            URI configDescriptionURI) throws IllegalArgumentException {
+        this(uid, supportedBridgeTypeUIDs, label, description, category, listed, null, channelDefinitions,
+                channelGroupDefinitions, properties, configDescriptionURI);
+    }
+
+    /**
+     * Creates a new instance of this class with the specified parameters.
+     *
+     * @param uid the unique identifier which identifies this Thing type within the overall system
+     *            (must neither be null, nor empty)
+     * @param supportedBridgeTypeUIDs the unique identifiers of the bridges this Thing type supports
+     *            (could be null or empty)
+     * @param label the human readable label for the according type
+     *            (must neither be null nor empty)
+     * @param description the human readable description for the according type
+     *            (could be null or empty)
+     * @param listed determines whether it should be listed for manually pairing or not
+     * @param representationProperty name of the property that uniquely identifies this Thing
+     * @param channelDefinitions the channels this Thing type provides (could be null or empty)
+     * @param channelGroupDefinitions the channel groups defining the channels this Thing type
+     *            provides (could be null or empty)
+     * @param properties the properties this Thing type provides (could be null)
+     * @param configDescriptionURI the link to the concrete ConfigDescription (could be null)
+     *
+     * @throws IllegalArgumentException
+     *             if the UID is null or empty, or the the meta information is null
+     */
+    public ThingType(ThingTypeUID uid, List<String> supportedBridgeTypeUIDs, String label, String description,
+            String category, boolean listed, String representationProperty, List<ChannelDefinition> channelDefinitions,
             List<ChannelGroupDefinition> channelGroupDefinitions, Map<String, String> properties,
             URI configDescriptionURI) throws IllegalArgumentException {
 
         super(uid, label, description);
 
+        this.category = category;
         this.listed = listed;
+        this.representationProperty = representationProperty;
 
         if (supportedBridgeTypeUIDs != null) {
             this.supportedBridgeTypeUIDs = Collections.unmodifiableList(supportedBridgeTypeUIDs);
@@ -202,16 +226,6 @@ public class ThingType extends AbstractDescriptionType {
     }
 
     /**
-     * Returns {@code true} if a link to a concrete {@link ConfigDescription} exists,
-     * otherwise {@code false}.
-     *
-     * @return true if a link to a concrete ConfigDescription exists, otherwise false
-     */
-    public boolean hasConfigDescriptionURI() {
-        return (this.configDescriptionURI != null);
-    }
-
-    /**
      * Returns the link to a concrete {@link ConfigDescription}.
      *
      * @return the link to a concrete ConfigDescription (could be null)
@@ -225,7 +239,7 @@ public class ThingType extends AbstractDescriptionType {
      *
      * @return the properties for this {@link ThingType} (not null)
      */
-    public Map<String, String> getProperties() {
+    public @NonNull Map<@NonNull String, String> getProperties() {
         return properties;
     }
 
@@ -261,18 +275,39 @@ public class ThingType extends AbstractDescriptionType {
         return null;
     }
 
+    public String getCategory() {
+        return this.category;
+    }
+
+    /**
+     * Check, if things of this thing type should be listed for manually pairing or not.
+     *
+     * @return {@code true}, if manual pairing is allowed
+     */
     public boolean isListed() {
         return listed;
     }
 
+    /**
+     * Get the name of the representation property of this thing type. May be {code null}.
+     *
+     * @return representation property name or {@code null}
+     */
+    public @Nullable String getRepresentationProperty() {
+        return representationProperty;
+    }
+
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
 
         ThingType other = (ThingType) obj;
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -17,7 +17,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ExecutorService;
 
+import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.smarthome.core.common.ThreadPoolManager;
 import org.eclipse.smarthome.core.events.EventPublisher;
 import org.eclipse.smarthome.core.items.events.ItemEventFactory;
 import org.eclipse.smarthome.core.types.Command;
@@ -25,7 +28,10 @@ import org.eclipse.smarthome.core.types.RefreshType;
 import org.eclipse.smarthome.core.types.State;
 import org.eclipse.smarthome.core.types.StateDescription;
 import org.eclipse.smarthome.core.types.StateDescriptionProvider;
+import org.eclipse.smarthome.core.types.StateOption;
 import org.eclipse.smarthome.core.types.UnDefType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
@@ -43,6 +49,10 @@ import com.google.common.collect.ImmutableSet;
  */
 abstract public class GenericItem implements ActiveItem {
 
+    private final Logger logger = LoggerFactory.getLogger(GenericItem.class);
+
+    private static final String ITEM_THREADPOOLNAME = "items";
+
     protected EventPublisher eventPublisher;
 
     protected Set<StateChangeListener> listeners = new CopyOnWriteArraySet<StateChangeListener>(
@@ -52,8 +62,10 @@ abstract public class GenericItem implements ActiveItem {
 
     protected Set<String> tags = new HashSet<String>();
 
+    @NonNull
     final protected String name;
 
+    @NonNull
     final protected String type;
 
     protected State state = UnDefType.NULL;
@@ -64,57 +76,36 @@ abstract public class GenericItem implements ActiveItem {
 
     private List<StateDescriptionProvider> stateDescriptionProviders;
 
-    public GenericItem(String type, String name) {
+    public GenericItem(@NonNull String type, @NonNull String name) {
         this.name = name;
         this.type = type;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public State getState() {
         return state;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public State getStateAs(Class<? extends State> typeClass) {
-        if (typeClass != null && typeClass.isInstance(state)) {
-            return state;
-        } else {
-            return null;
-        }
+        return state.as(typeClass);
     }
 
-    public void initialize() {
+    @Override
+    public String getUID() {
+        return getName();
     }
 
-    public void dispose() {
-        this.eventPublisher = null;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public String getName() {
         return name;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public String getType() {
         return type;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<String> getGroupNames() {
         return ImmutableList.copyOf(groupNames);
@@ -184,12 +175,27 @@ abstract public class GenericItem implements ActiveItem {
     }
 
     /**
-     * Sets new state, notifies listeners and sends events.
+     * Set a new state.
+     *
+     * Subclasses may override this method in order to do necessary conversions upfront. Afterwards,
+     * {@link #applyState(State)} should be called by classes overriding this method.
      *
      * @param state
      *            new state of this item
      */
     public void setState(State state) {
+        applyState(state);
+    }
+
+    /**
+     * Sets new state, notifies listeners and sends events.
+     *
+     * Classes overriding the {@link #setState(State)} method should call this method in order to actually set the
+     * state, inform listeners and send the event.
+     *
+     * @param state new state of this item
+     */
+    protected final void applyState(State state) {
         State oldState = this.state;
         this.state = state;
         notifyListeners(oldState, state);
@@ -208,23 +214,29 @@ abstract public class GenericItem implements ActiveItem {
         internalSend(command);
     }
 
-    protected void notifyListeners(State oldState, State newState) {
+    protected void notifyListeners(final State oldState, final State newState) {
         // if nothing has changed, we send update notifications
         Set<StateChangeListener> clonedListeners = null;
         clonedListeners = new CopyOnWriteArraySet<StateChangeListener>(listeners);
-        for (StateChangeListener listener : clonedListeners) {
-            listener.stateUpdated(this, newState);
-        }
-        if (newState != null && !newState.equals(oldState)) {
-            for (StateChangeListener listener : clonedListeners) {
-                listener.stateChanged(this, oldState, newState);
-            }
+        ExecutorService pool = ThreadPoolManager.getPool(ITEM_THREADPOOLNAME);
+        for (final StateChangeListener listener : clonedListeners) {
+            pool.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        listener.stateUpdated(GenericItem.this, newState);
+                        if (newState != null && !newState.equals(oldState)) {
+                            listener.stateChanged(GenericItem.this, oldState, newState);
+                        }
+                    } catch (Exception e) {
+                        logger.warn("failed notifying listener '{}' about state update of item {}: {}", listener,
+                                GenericItem.this.getName(), e.getMessage(), e);
+                    }
+                }
+            });
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -283,38 +295,43 @@ abstract public class GenericItem implements ActiveItem {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
+        if (this == obj) {
             return true;
-        if (obj == null)
+        }
+        if (obj == null) {
             return false;
-        if (getClass() != obj.getClass())
+        }
+        if (getClass() != obj.getClass()) {
             return false;
+        }
         GenericItem other = (GenericItem) obj;
         if (category == null) {
-            if (other.category != null)
+            if (other.category != null) {
                 return false;
-        } else if (!category.equals(other.category))
+            }
+        } else if (!category.equals(other.category)) {
             return false;
+        }
         if (label == null) {
-            if (other.label != null)
+            if (other.label != null) {
                 return false;
-        } else if (!label.equals(other.label))
+            }
+        } else if (!label.equals(other.label)) {
             return false;
-        if (name == null) {
-            if (other.name != null)
-                return false;
-        } else if (!name.equals(other.name))
+        }
+        if (!name.equals(other.name)) {
             return false;
+        }
         if (tags == null) {
-            if (other.tags != null)
+            if (other.tags != null) {
                 return false;
-        } else if (!tags.equals(other.tags))
+            }
+        } else if (!tags.equals(other.tags)) {
             return false;
-        if (type == null) {
-            if (other.type != null)
-                return false;
-        } else if (!type.equals(other.type))
+        }
+        if (!type.equals(other.type)) {
             return false;
+        }
         return true;
     }
 
@@ -375,20 +392,57 @@ abstract public class GenericItem implements ActiveItem {
 
     @Override
     public StateDescription getStateDescription() {
-        return getStateDescription(Locale.getDefault());
+        return getStateDescription(null);
     }
 
     @Override
     public StateDescription getStateDescription(Locale locale) {
+        StateDescription result = null;
+        List<StateOption> stateOptions = Collections.emptyList();
         if (stateDescriptionProviders != null) {
             for (StateDescriptionProvider stateDescriptionProvider : stateDescriptionProviders) {
                 StateDescription stateDescription = stateDescriptionProvider.getStateDescription(this.name, locale);
-                if (stateDescription != null) {
-                    return stateDescription;
+
+                // as long as no valid StateDescription is provided we reassign here:
+                if (result == null) {
+                    result = stateDescription;
+                }
+
+                // if the current StateDescription does provide options and we don't already have some, we pick them up
+                // here
+                if (stateDescription != null && !stateDescription.getOptions().isEmpty() && stateOptions.isEmpty()) {
+                    stateOptions = stateDescription.getOptions();
                 }
             }
         }
-        return null;
+
+        // we recreate the StateDescription if we found a valid one and state options are given:
+        if (result != null && !stateOptions.isEmpty()) {
+            result = new StateDescription(result.getMinimum(), result.getMaximum(), result.getStep(),
+                    result.getPattern(), result.isReadOnly(), stateOptions);
+        }
+
+        return result;
+    }
+
+    /**
+     * Tests if state is within acceptedDataTypes list or a subclass of one of them
+     *
+     * @param acceptedDataTypes list of datatypes this items accepts as a state
+     * @param state to be tested
+     * @return true if state is an acceptedDataType or subclass thereof
+     */
+    public boolean isAcceptedState(List<Class<? extends State>> acceptedDataTypes, State state) {
+        if (acceptedDataTypes.stream().map(clazz -> clazz.isAssignableFrom(state.getClass()))
+                .filter(found -> found == true).findAny().isPresent()) {
+            return true;
+        }
+        return false;
+    }
+
+    protected void logSetTypeError(State state) {
+        logger.error("Tried to set invalid state {} ({}) on item {} of type {}, ignoring it", state,
+                state.getClass().getSimpleName(), getName(), getClass().getSimpleName());
     }
 
 }

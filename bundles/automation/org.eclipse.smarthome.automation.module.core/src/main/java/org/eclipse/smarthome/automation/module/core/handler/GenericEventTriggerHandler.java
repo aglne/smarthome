@@ -7,15 +7,17 @@
  */
 package org.eclipse.smarthome.automation.module.core.handler;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Dictionary;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 
 import org.eclipse.smarthome.automation.Trigger;
-import org.eclipse.smarthome.automation.handler.BaseModuleHandler;
-import org.eclipse.smarthome.automation.handler.RuleEngineCallback;
-import org.eclipse.smarthome.automation.handler.TriggerHandler;
+import org.eclipse.smarthome.automation.handler.BaseTriggerModuleHandler;
 import org.eclipse.smarthome.core.events.Event;
 import org.eclipse.smarthome.core.events.EventFilter;
 import org.eclipse.smarthome.core.events.EventSubscriber;
@@ -23,9 +25,6 @@ import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 
 /**
  * This is an ModuleHandler implementation for Triggers which trigger the rule
@@ -40,17 +39,16 @@ import com.google.common.collect.Maps;
  * @author Kai Kreuzer - refactored and simplified customized module handling
  *
  */
-public class GenericEventTriggerHandler extends BaseModuleHandler<Trigger>implements TriggerHandler, EventSubscriber {
+public class GenericEventTriggerHandler extends BaseTriggerModuleHandler implements EventSubscriber, EventFilter {
 
     private final Logger logger = LoggerFactory.getLogger(GenericEventTriggerHandler.class);
 
-    private RuleEngineCallback callback;
     private String source;
     private String topic;
     private Set<String> types;
     private BundleContext bundleContext;
 
-    public static final String MODULE_TYPE_ID = "GenericEventTrigger";
+    public static final String MODULE_TYPE_ID = "core.GenericEventTrigger";
 
     private static final String CFG_EVENT_TOPIC = "eventTopic";
     private static final String CFG_EVENT_SOURCE = "eventSource";
@@ -63,7 +61,8 @@ public class GenericEventTriggerHandler extends BaseModuleHandler<Trigger>implem
         super(module);
         this.source = (String) module.getConfiguration().get(CFG_EVENT_SOURCE);
         this.topic = (String) module.getConfiguration().get(CFG_EVENT_TOPIC);
-        this.types = ImmutableSet.copyOf(((String) module.getConfiguration().get(CFG_EVENT_TYPES)).split(","));
+        this.types = Collections.unmodifiableSet(
+                new HashSet<>(Arrays.asList(((String) module.getConfiguration().get(CFG_EVENT_TYPES)).split(","))));
         this.bundleContext = bundleContext;
         Dictionary<String, Object> properties = new Hashtable<String, Object>();
         properties.put("event.topics", topic);
@@ -73,31 +72,27 @@ public class GenericEventTriggerHandler extends BaseModuleHandler<Trigger>implem
     }
 
     @Override
-    public void setRuleEngineCallback(RuleEngineCallback ruleCallback) {
-        this.callback = ruleCallback;
-    }
-
-    @Override
     public Set<String> getSubscribedEventTypes() {
         return types;
     }
 
     @Override
     public EventFilter getEventFilter() {
-        return null;
+        return this;
     }
 
     @Override
     public void receive(Event event) {
-        if (callback != null) {
-            logger.trace("Received Event: Source: " + event.getSource() + " Topic: " + event.getTopic() + " Type: "
-                    + event.getType() + " Payload: " + event.getPayload());
+        if (ruleEngineCallback != null) {
+            logger.trace("Received Event: Source: {} Topic: {} Type: {}  Payload: {}", event.getSource(),
+                    event.getTopic(), event.getType(), event.getPayload());
             if (!event.getTopic().contains(source)) {
                 return;
             }
-            Map<String, Object> values = Maps.newHashMap();
+            Map<String, Object> values = new HashMap<>();
             values.put("event", event);
-            callback.triggered(this.module, values);
+
+            ruleEngineCallback.triggered(this.module, values);
         }
     }
 
@@ -121,10 +116,17 @@ public class GenericEventTriggerHandler extends BaseModuleHandler<Trigger>implem
      */
     @Override
     public void dispose() {
+        super.dispose();
         if (eventSubscriberRegistration != null) {
             eventSubscriberRegistration.unregister();
             eventSubscriberRegistration = null;
         }
+    }
+
+    @Override
+    public boolean apply(Event event) {
+        logger.trace("->FILTER: {}:{}", event.getTopic(), source);
+        return event.getTopic().contains(source);
     }
 
 }

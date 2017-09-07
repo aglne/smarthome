@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -25,6 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.io.FilenameUtils;
 import org.eclipse.smarthome.config.core.ConfigConstants;
+import org.eclipse.smarthome.core.i18n.LocaleProvider;
+import org.osgi.framework.BundleContext;
+import org.osgi.framework.ServiceReference;
+import org.osgi.util.tracker.ServiceTracker;
+import org.osgi.util.tracker.ServiceTrackerCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +42,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Gaël L'hopital - Initial contribution
  * @author Kai Kreuzer - File caching mechanism
+ * @author Markus Rathgeb - Add locale provider support
  */
 public abstract class AbstractFileTransformationService<T> implements TransformationService {
 
@@ -46,14 +52,55 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
     protected final List<String> watchedDirectories = new ArrayList<String>();
 
     private final Logger logger = LoggerFactory.getLogger(AbstractFileTransformationService.class);
-    private final String language = Locale.getDefault().getLanguage();
+
+    private LocaleProvider localeProvider;
+    private ServiceTracker<LocaleProvider, LocaleProvider> localeProviderTracker;
+
+    private class LocaleProviderServiceTrackerCustomizer
+            implements ServiceTrackerCustomizer<LocaleProvider, LocaleProvider> {
+
+        private final BundleContext context;
+
+        public LocaleProviderServiceTrackerCustomizer(final BundleContext context) {
+            this.context = context;
+        }
+
+        @Override
+        public LocaleProvider addingService(ServiceReference<LocaleProvider> reference) {
+            localeProvider = context.getService(reference);
+            return localeProvider;
+        }
+
+        @Override
+        public void modifiedService(ServiceReference<LocaleProvider> reference, LocaleProvider service) {
+        }
+
+        @Override
+        public void removedService(ServiceReference<LocaleProvider> reference, LocaleProvider service) {
+            localeProvider = null;
+        }
+
+    }
+
+    protected void activate(final BundleContext context) {
+        localeProviderTracker = new ServiceTracker<>(context, LocaleProvider.class,
+                new LocaleProviderServiceTrackerCustomizer(context));
+        localeProviderTracker.open();
+    }
+
+    protected void deactivate() {
+        localeProviderTracker.close();
+    }
+
+    protected Locale getLocale() {
+        return localeProvider.getLocale();
+    }
 
     /**
      * <p>
      * Transforms the input <code>source</code> by the according method defined in subclass to another string.
      * It expects the transformation to be read from a file which is stored
      * under the 'conf/transform'
-     * </p>
      *
      * @param filename
      *            the name of the file which contains the transformation definition.
@@ -62,9 +109,6 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
      * @param source
      *            the input to transform
      * @throws TransformationException
-     *
-     * @{inheritDoc
-     *
      */
     @Override
     public String transform(String filename, String source) throws TransformationException {
@@ -99,7 +143,6 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
      * <p>
      * Abstract method defined by subclasses to effectively operate the
      * transformation according to its rules
-     * </p>
      *
      * @param transform
      *            transformation held by the file provided to <code>transform</code> method
@@ -117,7 +160,6 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
      * <p>
      * Abstract method defined by subclasses to effectively read the transformation
      * source file according to their own needs.
-     * </p>
      *
      * @param filename
      *            Name of the file to be read. This filename may have been transposed
@@ -202,7 +244,7 @@ public abstract class AbstractFileTransformationService<T> implements Transforma
         // the filename may already contain locale information
         if (!filename.matches(".*_[a-z]{2}." + extension + "$")) {
             String basename = FilenameUtils.getBaseName(filename);
-            String alternateName = prefix + basename + "_" + language + "." + extension;
+            String alternateName = prefix + basename + "_" + getLocale().getLanguage() + "." + extension;
             String alternatePath = getSourcePath() + alternateName;
 
             File f = new File(alternatePath);

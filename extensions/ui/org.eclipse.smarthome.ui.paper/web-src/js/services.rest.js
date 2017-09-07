@@ -1,4 +1,4 @@
-angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function($httpProvider) {
+angular.module('PaperUI.services.rest', [ 'PaperUI.constants', 'ngResource' ]).config(function($httpProvider) {
     var accessToken = function getAccessToken() {
         return $('#authentication').data('access-token')
     }();
@@ -13,7 +13,7 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
         getAll : {
             method : 'GET',
             isArray : true,
-            url : restConfig.restPath + '/items?recursive=true'
+            url : restConfig.restPath + '/items?recursive=false'
         },
         getByName : {
             method : 'GET',
@@ -35,8 +35,12 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
                 itemName : '@itemName'
             },
             url : restConfig.restPath + '/items/:itemName',
-            headers : {
-                'Content-Type' : 'text/plain'
+            transformResponse : function(response, headerGetter, status) {
+                var response = angular.fromJson(response);
+                if (status == 405) {
+                    response.customMessage = "Item is not editable.";
+                }
+                return response;
             }
         },
         updateState : {
@@ -45,6 +49,19 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
                 itemName : '@itemName'
             },
             url : restConfig.restPath + '/items/:itemName/state',
+            headers : {
+                'Content-Type' : 'text/plain'
+            }
+        },
+        getItemState : {
+            method : 'GET',
+            params : {
+                itemName : '@itemName'
+            },
+            url : restConfig.restPath + '/items/:itemName/state',
+            transformResponse : function(data) {
+                return data;
+            },
             headers : {
                 'Content-Type' : 'text/plain'
             }
@@ -125,7 +142,14 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
     return $resource(restConfig.restPath + '/inbox', {}, {
         getAll : {
             method : 'GET',
-            isArray : true
+            isArray : true,
+            transformResponse : function(data) {
+                var results = angular.fromJson(data);
+                for (var i = 0; i < results.length; i++) {
+                    results[i].bindingType = results[i].thingTypeUID.split(':')[0];
+                }
+                return results
+            },
         },
         approve : {
             method : 'POST',
@@ -170,6 +194,11 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             params : {
                 bindingId : '@bindingId'
             },
+            transformResponse : function(data) {
+                return {
+                    timeout : angular.fromJson(data)
+                }
+            },
             url : restConfig.restPath + '/discovery/bindings/:bindingId/scan'
         }
     });
@@ -182,9 +211,17 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
         getByUid : {
             method : 'GET',
             params : {
-                bindingId : '@thingTypeUID'
+                thingTypeUID : '@thingTypeUID'
             },
             url : restConfig.restPath + '/thing-types/:thingTypeUID'
+        },
+        getFirmwares : {
+            method : 'GET',
+            isArray : true,
+            params : {
+                thingTypeUID : '@thingTypeUID'
+            },
+            url : restConfig.restPath + '/thing-types/:thingTypeUID/firmwares'
         }
     });
 }).factory('linkService', function($resource, restConfig) {
@@ -275,6 +312,28 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
                 channelId : '@channelId'
             },
             url : restConfig.restPath + '/things/:thingUID/channels/:channelId/link',
+        },
+        getFirmwareStatus : {
+            method : 'GET',
+            params : {
+                thingUID : '@thingUID'
+            },
+            url : restConfig.restPath + '/things/:thingUID/firmware/status',
+        },
+        installFirmware : {
+            method : 'PUT',
+            params : {
+                thingUID : '@thingUID',
+                firmwareVersion : '@firmwareVersion'
+            },
+            url : restConfig.restPath + '/things/:thingUID/firmware/:firmwareVersion'
+        },
+        cancel : {
+            method : 'GET',
+            params : {
+                thingUID : '@thingUID'
+            },
+            url : restConfig.restPath + '/update/:thingUID/cancel'
         }
     });
 }).factory('serviceConfigService', function($resource, restConfig) {
@@ -331,14 +390,29 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             params : {
                 uri : '@uri'
             },
+            transformResponse : function(response, headerGetter, status) {
+                var response = angular.fromJson(response);
+                if (status == 404) {
+                    response.showError = false;
+                }
+                return response;
+            },
             url : restConfig.restPath + '/config-descriptions/:uri'
         },
     });
-}).factory('extensionService', function($resource, restConfig) {
-    return $resource(restConfig.restPath + '/extensions', {}, {
+}).factory('extensionService', function($resource, restConfig, $http) {
+    var extensionService = $resource(restConfig.restPath + '/extensions', {}, {
         getAll : {
             method : 'GET',
-            isArray : true
+            isArray : true,
+            transformResponse : function(response, headerGetter, status) {
+                if (status == 503) {
+                    return {
+                        showError : false
+                    };
+                }
+                return angular.fromJson(response);
+            }
         },
         getByUri : {
             method : 'GET',
@@ -359,6 +433,13 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             },
             url : restConfig.restPath + '/extensions/:id/install'
         },
+        installFromURL : {
+            method : 'POST',
+            params : {
+                url : '@url'
+            },
+            url : restConfig.restPath + '/extensions/url/:url/install'
+        },
         uninstall : {
             method : 'POST',
             params : {
@@ -367,6 +448,16 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             url : restConfig.restPath + '/extensions/:id/uninstall'
         }
     });
+
+    extensionService.isAvailable = function(callback) {
+        $http.head(restConfig.restPath + '/extensions').then(function() {
+            callback(true);
+        }, function() {
+            callback(false);
+        });
+    }
+
+    return extensionService;
 }).factory('ruleService', function($resource, restConfig) {
     return $resource(restConfig.restPath + '/rules', {}, {
         getAll : {
@@ -435,10 +526,15 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
                 'Content-Type' : 'text/plain'
             }
         },
-        getRuleTemplates : {
-            method : 'GET',
-            url : restConfig.restPath + '/templates',
-            isArray : true
+        runRule : {
+            method : 'POST',
+            params : {
+                ruleUID : '@ruleUID'
+            },
+            url : restConfig.restPath + '/rules/:ruleUID/runnow',
+            headers : {
+                'Content-Type' : 'text/plain'
+            }
         }
     });
 }).factory('moduleTypeService', function($resource, restConfig) {
@@ -522,4 +618,57 @@ angular.module('PaperUI.services.rest', [ 'PaperUI.constants' ]).config(function
             url : restConfig.restPath + '/channel-types/:channelTypeUID'
         },
     });
+}).factory('templateService', function($resource, restConfig) {
+    return $resource(restConfig.restPath + '/channel-types', {}, {
+        getAll : {
+            method : 'GET',
+            url : restConfig.restPath + '/templates',
+            isArray : true
+        },
+        getByUid : {
+            method : 'GET',
+            params : {
+                templateUID : '@templateUID'
+            },
+            url : restConfig.restPath + '/templates/:templateUID'
+        },
+    });
+}).factory('imageService', function(restConfig, $http) {
+    return {
+        getItemState : function(itemName) {
+            var promise = $http.get(restConfig.restPath + "/items/" + itemName + "/state").then(function(response) {
+                return response.data;
+            });
+            return promise;
+        }
+    }
+}).factory('firmwareService', function($resource, restConfig) {
+    return $resource(restConfig.restPath + '/firmware', {}, {
+        getStatus : {
+            method : 'GET',
+            isArray : true
+        },
+        getByUid : {
+            method : 'GET',
+            params : {
+                thingUID : '@thingUID'
+            },
+            url : restConfig.restPath + '/:thingUID'
+        },
+        update : {
+            method : 'GET',
+            params : {
+                thingUID : '@thingUID'
+            },
+            url : restConfig.restPath + '/update/:thingUID'
+        },
+        cancel : {
+            method : 'GET',
+            params : {
+                thingUID : '@thingUID'
+            },
+            url : restConfig.restPath + '/update/:thingUID/cancel'
+        }
+    });
 });
+;

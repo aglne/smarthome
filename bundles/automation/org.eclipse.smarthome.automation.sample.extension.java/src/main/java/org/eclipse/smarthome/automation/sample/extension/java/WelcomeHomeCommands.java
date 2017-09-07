@@ -18,6 +18,7 @@ import org.eclipse.smarthome.automation.sample.extension.java.handler.WelcomeHom
 import org.eclipse.smarthome.automation.sample.extension.java.template.AirConditionerRuleTemplate;
 import org.eclipse.smarthome.automation.sample.extension.java.type.StateConditionType;
 import org.eclipse.smarthome.automation.sample.extension.java.type.TemperatureConditionType;
+import org.eclipse.smarthome.config.core.Configuration;
 import org.eclipse.smarthome.io.console.Console;
 import org.eclipse.smarthome.io.console.extensions.AbstractConsoleCommandExtension;
 import org.eclipse.smarthome.io.console.extensions.ConsoleCommandExtension;
@@ -81,8 +82,8 @@ public class WelcomeHomeCommands extends AbstractConsoleCommandExtension {
         }
         if (COMMAND_SETTINGS.equalsIgnoreCase(command) || COMMAND_SETTINGS_SHORT.equalsIgnoreCase(command)) {
             settings(params, console);
-        } else
-            if (COMMAND_ACTIVATE_AC.equalsIgnoreCase(command) || COMMAND_ACTIVATE_AC_SHORT.equalsIgnoreCase(command)) {
+        } else if (COMMAND_ACTIVATE_AC.equalsIgnoreCase(command)
+                || COMMAND_ACTIVATE_AC_SHORT.equalsIgnoreCase(command)) {
             activate(params, console);
         } else if (COMMAND_ACTIVATE_L.equalsIgnoreCase(command) || COMMAND_ACTIVATE_L_SHORT.equalsIgnoreCase(command)) {
             activateLights(params, console);
@@ -211,9 +212,7 @@ public class WelcomeHomeCommands extends AbstractConsoleCommandExtension {
             console.println("Missing required parameters");
             return;
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> config = (Map<String, Object>) rulesProvider.rules.get(WelcomeHomeRulesProvider.AC_UID)
-                .getConfiguration();
+        Configuration config = rulesProvider.rules.get(WelcomeHomeRulesProvider.AC_UID).getConfiguration();
         if (params[0] != null && (params[0].equalsIgnoreCase(TemperatureConditionType.OPERATOR_HEATING)
                 || params[0].equalsIgnoreCase(TemperatureConditionType.OPERATOR_COOLING))) {
             config.put(AirConditionerRuleTemplate.CONFIG_OPERATION, params[0]);

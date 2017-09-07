@@ -23,6 +23,9 @@
                     <span class="side-menu">Configuration</span>
                 </a>
                 <ul ng-show="isActive('configuration')">
+                    <li ng-class="{active: isSubActive('system')}">
+                        <a href="#configuration/system">System</a>
+                    </li>
                     <li ng-class="{active: isSubActive('bindings')}">
                         <a href="#configuration/bindings">Bindings</a>
                     </li>
@@ -32,12 +35,15 @@
                     <li ng-class="{active: isSubActive('things')}">
                         <a href="#configuration/things">Things</a>
                     </li>
+                    <li ng-if="advancedMode" ng-class="{active: isSubActive('items')}">
+                        <a href="#configuration/items">Items</a>
+                    </li>
                 </ul>
             </li>
             <li ng-show="extensionEnabled" ng-class="{active: isActive('extensions'), hidden: isHidden('extensions')}">
                 <a href="#extensions">
                     <span class="icon material-icons">extension</span>
-                    <span class="side-menu">Extensions</span>
+                    <span class="side-menu">{{getLabel('extensions')}}</span>
                 </a>
             </li>
             <li ng-show="ruleEnabled" ng-class="{active: isActive('rules'), hidden: isHidden('rules')}">

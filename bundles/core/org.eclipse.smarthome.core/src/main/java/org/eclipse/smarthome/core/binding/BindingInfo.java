@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2014-2015 openHAB UG (haftungsbeschraenkt) and others.
+ * Copyright (c) 2014-2017 by the respective copyright holders.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -8,6 +8,8 @@
 package org.eclipse.smarthome.core.binding;
 
 import java.net.URI;
+
+import org.eclipse.smarthome.core.common.registry.Identifiable;
 
 /**
  * The {@link BindingInfo} class contains general information about a binding.
@@ -20,7 +22,7 @@ import java.net.URI;
  * @author Michael Grammling - Initial Contribution
  * @author Andre Fuechsel - Made author tag optional
  */
-public class BindingInfo {
+public class BindingInfo implements Identifiable<String> {
 
     /**
      * The default service ID prefix.
@@ -69,7 +71,8 @@ public class BindingInfo {
      *
      * @return an identifier for the binding (neither null, nor empty)
      */
-    public String getId() {
+    @Override
+    public String getUID() {
         return this.id;
     }
 
@@ -99,16 +102,6 @@ public class BindingInfo {
      */
     public String getAuthor() {
         return this.author;
-    }
-
-    /**
-     * Returns {@code true} if a link to a concrete {@link ConfigDescription} exists,
-     * otherwise {@code false}.
-     *
-     * @return true if a link to a concrete ConfigDescription exists, otherwise false
-     */
-    public boolean hasConfigDescriptionURI() {
-        return (this.configDescriptionURI != null);
     }
 
     /**
